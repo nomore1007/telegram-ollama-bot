@@ -3,6 +3,11 @@
 import logging
 import asyncio
 import re
+import sys
+import os
+
+# Add current directory to Python path for local imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 from telegram import Update, BotCommand
 from telegram.ext import (
