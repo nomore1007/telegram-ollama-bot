@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Telegram Bot Service (connects to existing Ollama)
+  telegram-bot:
+    image: ghcr.io/nomore1007/telegram-ollama-bot:latest
+    container_name: deepthought-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BOT_USERNAME=${BOT_USERNAME:-DeepthoughtBot}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - MAX_TOKENS=${MAX_TOKENS:-2000}
+      - TEMPERATURE=${TEMPERATURE:-0.7}
+      - TIMEOUT=${TIMEOUT:-30}
+      - DEFAULT_PROMPT=${DEFAULT_PROMPT}
+    networks:
+      - bot-network
+    volumes:
+      - bot_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Optional: Expose port if you want direct access
+    # ports:
+    #   - "8080:8080"
+
+volumes:
+  bot_logs:
+    driver: local
+
+networks:
+  bot-network:
+    driver: bridge

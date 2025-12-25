@@ -1,12 +1,14 @@
-# 🚀 Portainer Deployment Guide
+# 🚀 Portainer Deployment Guide (Bot Only)
 
 ## Prerequisites
 
 1. **Portainer Installed**: Access your Portainer instance (typically at `http://your-server:9000` or `https://portainer.yourdomain.com`)
 
-2. **GitHub Repository**: Your bot repository at `https://github.com/nomore1007/telegram-ollama-bot`
+2. **Existing Ollama Instance**: You already have Ollama running (locally or remote)
 
-3. **Docker Environment**: Portainer connected to Docker engine with sufficient resources (4GB+ RAM recommended)
+3. **GitHub Repository**: Your bot repository at `https://github.com/nomore1007/telegram-ollama-bot`
+
+4. **Network Access**: Bot container can reach your Ollama instance
 
 ## Step 1: Access Portainer
 
@@ -36,14 +38,16 @@ DEFAULT_PROMPT=You are a helpful AI assistant. Respond to the user's message lik
 2. Create a volume named `telegram-bot-env`
 3. Use Portainer's file browser to create a `.env` file in the volume
 
-## Step 3: Deploy the Stack
+## Step 3: Deploy the Bot Stack
 
-### Option A: Use Pre-built Image (Recommended)
+### Simplified Deployment (Recommended)
+
+Since you already have Ollama running, we'll deploy only the bot container:
 
 1. Go to **Stacks** in Portainer sidebar
 2. Click **Add Stack**
 3. Configure:
-   - **Name**: `telegram-ollama-bot`
+   - **Name**: `telegram-bot`
    - **Repository URL**: Leave empty (we'll paste compose content)
    - **Compose path**: Leave empty
 
@@ -60,14 +64,12 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - BOT_USERNAME=${BOT_USERNAME:-DeepthoughtBot}
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
       - MAX_TOKENS=${MAX_TOKENS:-2000}
       - TEMPERATURE=${TEMPERATURE:-0.7}
       - TIMEOUT=${TIMEOUT:-30}
       - DEFAULT_PROMPT=${DEFAULT_PROMPT}
-    depends_on:
-      - ollama
     networks:
       - bot-network
     volumes:
@@ -83,32 +85,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-server
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - bot-network
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
 volumes:
-  ollama_data:
-    driver: local
   bot_logs:
     driver: local
 
@@ -118,6 +95,50 @@ networks:
 ```
 
 5. Click **Deploy the stack**
+
+## Step 4: Configure Environment Variables
+
+**Important:** Since Ollama is running externally, configure the `OLLAMA_HOST` to point to your existing Ollama instance.
+
+### In Portainer Stack:
+1. After creating the stack, click on it
+2. Go to **Environment** tab
+3. Add these variables:
+
+**Required:**
+- `TELEGRAM_BOT_TOKEN=your_telegram_bot_token`
+
+**Ollama Connection (adjust for your setup):**
+- `OLLAMA_HOST=http://host.docker.internal:11434` (if Ollama on same machine - Docker Desktop)
+- `OLLAMA_HOST=http://172.17.0.1:11434` (if Ollama on same machine - Linux Docker)
+- `OLLAMA_HOST=http://192.168.1.100:11434` (if Ollama on different machine)
+- `OLLAMA_HOST=http://ollama.local:11434` (if using DNS)
+
+**Optional:**
+- `BOT_USERNAME=DeepthoughtBot`
+- `OLLAMA_MODEL=llama2`
+- `TIMEOUT=30`
+
+### Network Configuration Guide
+
+**For Ollama on same machine as Docker:**
+- **Docker Desktop (Windows/Mac):** `http://host.docker.internal:11434`
+- **Linux Docker:** `http://172.17.0.1:11434` (check with `ip route`)
+
+**For Ollama on different machine:**
+- Use the actual IP: `http://192.168.1.100:11434`
+- Ensure firewall allows connection on port 11434
+
+**For Ollama in another container:**
+- Use container name: `http://ollama-container:11434`
+
+## Step 5: Verify Ollama Connection
+
+After deployment, verify the bot can connect to Ollama:
+
+1. Go to **Containers** → `deepthought-bot` → **Logs**
+2. Look for successful connection messages
+3. Test by sending a message to your bot on Telegram
 
 ### Option B: Build from Source
 
@@ -181,11 +202,14 @@ Portainer → telegram-bot container → Logs
 ```
 Look for connection errors or missing environment variables.
 
-### Ollama Issues:
-```
-Portainer → ollama-server container → Console
-ollama list  # Check if models are downloaded
-```
+### Ollama Connection Issues:
+1. **Check Ollama is running:** From your Ollama machine, run `ollama list`
+2. **Test network connectivity:** From Portainer → bot container → Console:
+   ```bash
+   curl -X POST http://your-ollama-host:11434/api/tags
+   ```
+3. **Verify OLLAMA_HOST setting:** Check the environment variable in Portainer stack
+4. **Firewall:** Ensure port 11434 is accessible from the bot container
 
 ### Environment Variables:
 ```
@@ -205,9 +229,9 @@ Verify all variables are set correctly.
 - **ollama**: Usually single instance, but can be scaled with shared volume
 
 ### Backup:
-- **Ollama models**: Backup `ollama_data` volume
 - **Bot logs**: Backup `bot_logs` volume
 - **Configuration**: Export stack configuration
+- **Ollama models**: Handle separately on your Ollama instance
 
 ## Security Notes
 
