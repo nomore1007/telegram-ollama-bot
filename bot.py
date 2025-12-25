@@ -5,9 +5,15 @@ import asyncio
 import re
 import sys
 import os
+import importlib.util
 
 # Add current directory to Python path for local imports
-sys.path.insert(0, os.path.dirname(__file__))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Now we can import settings as a module
+import settings
 
 from telegram import Update, BotCommand
 from telegram.ext import (
@@ -18,8 +24,6 @@ from telegram.ext import (
     CallbackContext,
     filters,
 )
-
-import settings
 from constants import (
     MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
     LOG_FORMAT, LOG_LEVEL
