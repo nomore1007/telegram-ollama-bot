@@ -3,7 +3,8 @@ requests>=2.31.0
 newspaper3k>=0.2.8
 youtube-transcript-api>=0.6.2
 pytube>=15.0.0
-lxml[html_clean]>=4.9.0
+lxml>=4.9.0
+lxml_html_clean>=0.4.3
 
 # Testing
 pytest>=7.4.0
