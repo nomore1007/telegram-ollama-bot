@@ -34,4 +34,8 @@ fi
 # Activate virtual environment and run bot
 echo "🚀 Starting bot..."
 source bot_env/bin/activate
+
+# Set PYTHONPATH to include current directory
+export PYTHONPATH="$(pwd):$PYTHONPATH"
+
 python bot.py
