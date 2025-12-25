@@ -32,34 +32,47 @@ echo ""
 echo "🔧 Testing bot imports..."
 
 # Create a temporary Python test script
-cat > /tmp/test_imports.py << 'EOF'
+PROJECT_DIR="$(pwd)"
+cat > /tmp/test_imports.py << EOF
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath('.')))
+
+# Add project directory to path
+sys.path.insert(0, '$PROJECT_DIR')
+
+# Load settings directly (same as bot.py)
+settings_path = os.path.join('$PROJECT_DIR', 'settings.py')
+if os.path.exists(settings_path):
+    with open(settings_path, 'r', encoding='utf-8') as f:
+        exec(f.read(), globals())
+else:
+    print(f'Settings file not found at {settings_path}')
+    exit(1)
+
 try:
-    import settings
-    print('✅ Settings imported')
+    print('Settings loaded')
 
     from constants import MAX_MESSAGE_LENGTH
-    print('✅ Constants imported')
+    print('Constants imported')
 
     from ollama_client import OllamaClient
-    print('✅ Ollama client imported')
+    print('Ollama client imported')
 
     from conversation import ConversationManager
-    print('✅ Conversation manager imported')
+    print('Conversation manager imported')
 
     from security import InputValidator
-    print('✅ Security modules imported')
+    print('Security modules imported')
 
     print('')
-    print('🎉 All imports successful!')
+    print('All imports successful!')
     print('')
-    print('🚀 Ready to run the bot!')
+    print('Ready to run the bot!')
 
 except Exception as e:
-    print(f'❌ Import failed: {e}')
-    import sys
-    sys.exit(1)
+    print(f'Import failed: {e}')
+    import traceback
+    traceback.print_exc()
+    exit(1)
 EOF
 
 if python3 /tmp/test_imports.py; then
