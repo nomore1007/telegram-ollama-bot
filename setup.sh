@@ -20,9 +20,42 @@ TOKEN="$1"
 
 echo "✅ Token received (length: ${#TOKEN})"
 
-# Set environment variable
+# Create settings.py with the token
+cat > settings.py << EOF
+# Bot Configuration - Created by setup.sh
+# This file contains sensitive information and is excluded from version control
+
+# Telegram Bot Token (from @BotFather)
+TELEGRAM_BOT_TOKEN: str = "$TOKEN"
+
+# Bot Identity
+BOT_USERNAME: str = "DeepthoughtBot"
+
+# Ollama AI Configuration
+OLLAMA_HOST: str = "http://buntcomm.com:11434"
+OLLAMA_MODEL: str = "llama2"
+
+# AI Model Parameters
+MAX_TOKENS: int = 2000
+TEMPERATURE: float = 0.7
+TIMEOUT: int = 30
+
+# Default AI Prompt
+DEFAULT_PROMPT: str = """You are a helpful AI assistant. Respond to the user's message like a dude bro, but informative and concise. Be helpful and accurate in your responses."""
+
+# Validate required settings
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN is required")
+
+if not OLLAMA_HOST:
+    raise ValueError("OLLAMA_HOST is required")
+EOF
+
+echo "✅ Settings.py created with your token"
+
+# Set environment variable as backup
 export TELEGRAM_BOT_TOKEN="$TOKEN"
-export OLLAMA_HOST="http://localhost:11434"
+export OLLAMA_HOST="http://buntcomm.com:11434"
 export OLLAMA_MODEL="llama2"
 
 echo "✅ Environment variables set"

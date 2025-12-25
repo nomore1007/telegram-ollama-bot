@@ -13,22 +13,23 @@ if [ ! -d "bot_env" ]; then
     exit 1
 fi
 
-# Check if token is set
-if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
-    echo "⚠️  TELEGRAM_BOT_TOKEN environment variable not set!"
-    echo "Set it with: export TELEGRAM_BOT_TOKEN='your_token_here'"
+# Check if settings.py exists and has a token
+if [ ! -f "settings.py" ] || ! grep -q "TELEGRAM_BOT_TOKEN.*=" settings.py 2>/dev/null; then
+    echo "⚠️  settings.py not found or invalid!"
+    echo "Run: ./setup.sh YOUR_TELEGRAM_TOKEN"
     echo ""
     echo "Get your token from: https://t.me/botfather"
-    echo ""
-    read -p "Do you want to continue with a test token? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        export TELEGRAM_BOT_TOKEN="test_token_for_testing"
-        echo "✅ Using test token (replace with real token for production)"
-    else
-        echo "❌ Please set TELEGRAM_BOT_TOKEN and run again"
-        exit 1
-    fi
+    exit 1
+fi
+
+# Extract token from settings.py for environment variable
+TOKEN_FROM_SETTINGS=$(grep "TELEGRAM_BOT_TOKEN.*=" settings.py | sed 's/.*= *"*\([^"]*\)"*/\1/' | tr -d "'\"")
+if [ -n "$TOKEN_FROM_SETTINGS" ]; then
+    export TELEGRAM_BOT_TOKEN="$TOKEN_FROM_SETTINGS"
+    echo "✅ Token loaded from settings.py"
+else
+    echo "❌ Could not extract token from settings.py"
+    exit 1
 fi
 
 # Activate virtual environment and run bot
