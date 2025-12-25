@@ -1,0 +1,44 @@
+version: '3.8'
+
+# Development override - extends docker-compose.yml
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  telegram-bot:
+    # Mount source code for development
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    # Override command for development (can be changed)
+    command: ["python", "bot.py"]
+    environment:
+      - LOG_LEVEL=DEBUG
+    # Keep container running for debugging
+    stdin_open: true
+    tty: true
+
+  # Redis for future caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: deepthought-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  bot-network:
+    external: true

@@ -1,0 +1,437 @@
+"""Telegram bot handlers for commands and callbacks"""
+
+import logging
+from typing import Optional
+
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    BotCommand,
+)
+from telegram.ext import (
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    CallbackContext,
+    filters,
+)
+
+from constants import MAX_MESSAGE_LENGTH
+
+logger = logging.getLogger(__name__)
+
+
+class TelegramHandlers:
+    """Handles Telegram bot commands and messages"""
+
+    def __init__(self, bot_instance):
+        self.bot = bot_instance
+
+    # ---------------------------------------------------------------
+    # Command handlers
+    # ---------------------------------------------------------------
+
+    async def start(self, update, context: CallbackContext):
+        """Handle /start command"""
+        if update.message:
+            await update.message.reply_text(
+                "🤖 *Telegram Ollama Bot*\n\n"
+                "📋 *Commands:*\n"
+                "`/help` - Show all available commands\n"
+                "`/menu` - Show the main menu\n"
+                "`/model` - Show current model info\n"
+                "`/listmodels` - List available models\n"
+                "`/setmodel` - Select a model\n"
+                "`/setprompt` - Set custom AI prompt\n"
+                "`/timeout` - Set request timeout\n\n"
+                "🔍 *Auto Features:*\n"
+                "📰 *News Detection:* Send any message with a news link!\n"
+                "🎬 *YouTube Detection:* Send any message with a YouTube link!\n\n"
+                "💬 *Chat:* Just send any message to talk with AI!\n\n"
+                f"🧠 Current model: `{self.bot.config.OLLAMA_MODEL}`\n"
+                f"⏱️ Timeout: `{self.bot.config.TIMEOUT}s`",
+                parse_mode="Markdown"
+            )
+
+    async def help_command(self, update, context: CallbackContext):
+        """Handle /help command"""
+        if update.message:
+            await update.message.reply_text(
+                "🤖 *Telegram Ollama Bot - Commands*\n\n"
+                "📋 *Basic Commands:*\n"
+                "`/start` - Show welcome message and commands\n"
+                "`/help` - Show this help message\n"
+                "`/menu` - Show the main menu\n"
+                "`/model` - Show current AI model info\n"
+                "`/listmodels` - List all available AI models\n"
+                "`/setmodel` - Interactive AI model selection\n"
+                "`/setprompt` - Set custom AI prompt\n"
+                "`/timeout` - Set request timeout\n\n"
+                "🔍 *Auto Features:*\n"
+                "📰 *News Summarization:* Send any message with a news link\n"
+                "🎬 *YouTube Summarization:* Send any message with a YouTube link\n\n"
+                "💬 *Chat:* Just send any message to talk with AI!\n\n"
+                "💡 *Examples:*\n"
+                "`/setprompt You are a helpful coding assistant`\n"
+                "`/timeout 60`\n"
+                "`Check this: https://www.bbc.com/news/story`",
+                parse_mode="Markdown"
+            )
+
+    async def show_menu(self, update, context: CallbackContext):
+        """Handle /menu command"""
+        if update.message:
+            keyboard = [
+                [InlineKeyboardButton("💬 Chat", callback_data="chat")],
+                [InlineKeyboardButton("📰 News Summarizer", callback_data="news")],
+                [InlineKeyboardButton("🎬 YouTube Summarizer", callback_data="youtube")],
+                [InlineKeyboardButton("⚙️ Model Settings", callback_data="model")],
+                [InlineKeyboardButton("❓ Help", callback_data="help")],
+            ]
+            await update.message.reply_text(
+                "🤖 *Main Menu*\n\nChoose an option:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+
+    async def model_info(self, update, context: CallbackContext):
+        """Handle /model command"""
+        if update.message:
+            await update.message.reply_text(
+                f"🧠 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
+                f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
+                f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`",
+                parse_mode="Markdown",
+            )
+
+    async def list_models_cmd(self, update, context: CallbackContext):
+        """Handle /listmodels command"""
+        models = await self.bot.ollama.list_models()
+        if not models:
+            if update.message:
+                await update.message.reply_text("❌ No models found.")
+            return
+
+        text = "\n".join(f"• {m}" for m in models)
+        if update.message:
+            await update.message.reply_text(f"🤖 Available models:\n{text}")
+
+    async def set_model(self, update, context: CallbackContext):
+        """Handle /setmodel command"""
+        models = await self.bot.ollama.list_models()
+        if not models:
+            if update.message:
+                await update.message.reply_text("❌ No models available.")
+            return
+
+        # Store models list in user_data for callback lookup
+        if context.user_data:
+            context.user_data['model_list'] = models
+
+        # Use index-based callback data to avoid length limits
+        keyboard = [
+            [InlineKeyboardButton(m, callback_data=f"setmodel:{idx}")]
+            for idx, m in enumerate(models)
+        ]
+
+        if update.message:
+            await update.message.reply_text(
+                f"🤖 Select a model:\n(Current: {self.bot.config.OLLAMA_MODEL})",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+
+    async def set_timeout(self, update, context: CallbackContext):
+        """Handle /timeout command"""
+        try:
+            if not context.args or len(context.args) == 0:
+                raise ValueError("No timeout provided")
+
+            seconds = int(context.args[0])
+            if not 1 <= seconds <= 600:
+                raise ValueError("Timeout out of range")
+
+            self.bot.config.TIMEOUT = seconds
+            self.bot.ollama.timeout = seconds
+
+            if update.message:
+                await update.message.reply_text(f"✅ Timeout set to {seconds}s")
+
+        except (IndexError, ValueError):
+            if update.message:
+                await update.message.reply_text(
+                    "❌ Usage: /timeout <seconds> (1–600)"
+                )
+
+    async def set_prompt(self, update, context: CallbackContext):
+        """Handle /setprompt command"""
+        try:
+            if not context.args or len(context.args) == 0:
+                # Show current prompt
+                current_prompt = self.bot.custom_prompt[:100] + "..." if len(self.bot.custom_prompt) > 100 else self.bot.custom_prompt
+                if update.message:
+                    await update.message.reply_text(
+                        f"📝 *Current Prompt:*\n\n`{current_prompt}`\n\n"
+                        "💡 *To set a new prompt:* `/setprompt Your prompt here`",
+                        parse_mode="Markdown"
+                    )
+                return
+
+            # Join all arguments to form the prompt
+            new_prompt = " ".join(context.args)
+
+            if len(new_prompt) < 10:
+                raise ValueError("Prompt too short")
+
+            if len(new_prompt) > 1000:
+                raise ValueError("Prompt too long (max 1000 characters)")
+
+            self.bot.custom_prompt = new_prompt
+
+            if update.message:
+                preview = new_prompt[:100] + "..." if len(new_prompt) > 100 else new_prompt
+                await update.message.reply_text(
+                    f"✅ *Prompt Updated!*\n\n"
+                    f"📝 *New prompt:*\n`{preview}`",
+                    parse_mode="Markdown"
+                )
+
+        except (IndexError, ValueError) as e:
+            if update.message:
+                await update.message.reply_text(
+                    f"❌ Error: {str(e)}\n\n"
+                    "💡 *Usage:* `/setprompt Your custom prompt here`\n"
+                    "📏 *Length:* 10-1000 characters",
+                    parse_mode="Markdown"
+                )
+
+    # ---------------------------------------------------------------
+    # Callback handlers
+    # ---------------------------------------------------------------
+
+    async def menu_callback(self, update, context: CallbackContext):
+        """Handle menu callbacks"""
+        query = update.callback_query
+        if not query:
+            return
+
+        await query.answer()
+
+        if not query.data:
+            await query.edit_message_text("❌ Invalid callback data.")
+            return
+
+        action = query.data
+
+        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+
+        if action == "chat":
+            await query.edit_message_text(
+                "💬 *Chat Mode*\n\n"
+                "Just send me any message and I'll respond using the AI model.\n\n"
+                f"🧠 Current model: `{self.bot.config.OLLAMA_MODEL}`",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+        elif action == "news":
+            await query.edit_message_text(
+                "📰 *News Summarizer*\n\n"
+                "🤖 *Automatic Detection:* Simply send any message containing a news article link and I'll automatically summarize it!\n\n"
+                "📋 *Supported Sites:* BBC, CNN, Reuters, NY Times, Washington Post, Guardian, WSJ, Bloomberg, NBC News, ABC News, CBS News, Fox News, AP News, NPR, Vox, Politico, Wired, TechCrunch, and many more!\n\n"
+                "💡 *Example:* \"Check out this article: https://www.bbc.com/news/some-story\"\n\n"
+                "🚀 *Limit:* Up to 2 articles per message to prevent spam.",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+        elif action == "youtube":
+            await query.edit_message_text(
+                "🎬 *YouTube Summarizer*\n\n"
+                "🤖 *Automatic Detection:* Simply send any message containing a YouTube link and I'll automatically summarize the video!\n\n"
+                "📋 *Supported Formats:* Regular videos, shorts, embedded videos, and all YouTube URL variations\n\n"
+                "💡 *Examples:*\n"
+                "• \"Watch this: https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n"
+                "• \"Amazing short: https://youtu.be/dQw4w9WgXcQ\"\n"
+                "• \"Check out: https://www.youtube.com/shorts/VIDEO_ID\"\n\n"
+                "🎯 *Features:* Video info, transcript extraction, AI-powered summary\n"
+                "🚀 *Limit:* Up to 2 videos per message to prevent spam.",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+        elif action == "model":
+            keyboard = [
+                [InlineKeyboardButton("Show Info", callback_data="model_info")],
+                [InlineKeyboardButton("List Models", callback_data="listmodels")],
+                [InlineKeyboardButton("Set Model", callback_data="setmodel")],
+                [InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")],
+            ]
+            await query.edit_message_text(
+                "⚙️ *Model Settings*\n\nChoose an option:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        elif action == "listmodels":
+            await self._show_models_list(query)
+        elif action == "setmodel":
+            await self._show_model_selection(query, context)
+        elif action == "model_info":
+            await self._show_model_info(query)
+        elif action == "timeout":
+            await query.edit_message_text(
+                "⏱️ *Set Timeout*\n\n"
+                "Use the command:\n`/timeout <seconds>`\n\n"
+                "Valid range: 1-600 seconds\n"
+                f"Current timeout: `{self.bot.config.TIMEOUT}s`",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+        elif action == "help":
+            await self._show_help(query)
+        elif action == "back_to_menu":
+            await self.show_menu_query(query)
+        else:
+            await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
+
+    async def model_callback(self, update, context: CallbackContext):
+        """Handle model selection callbacks"""
+        query = update.callback_query
+        if not query:
+            return
+
+        await query.answer()
+
+        try:
+            if not query.data:
+                await query.edit_message_text("❌ Invalid callback data.")
+                return
+
+            # Parse index from callback data
+            model_idx = int(query.data.split(":", 1)[1])
+
+            # Get model list from user_data
+            model_list = []
+            if context.user_data:
+                model_list = context.user_data.get('model_list', [])
+
+            # Validate index
+            if not model_list or not (0 <= model_idx < len(model_list)):
+                await query.edit_message_text("❌ Model selection expired. Please use /setmodel again.")
+                return
+
+            model_name = model_list[model_idx]
+
+            self.bot.config.OLLAMA_MODEL = model_name
+            self.bot.ollama.model = model_name
+
+            await query.edit_message_text(
+                f"✅ Model updated to:\n`{model_name}`",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+            )
+
+        except (ValueError, IndexError) as e:
+            logger.error(f"Model callback error: {e}")
+            if query:
+                await query.edit_message_text("❌ Failed to update model.")
+
+    # ---------------------------------------------------------------
+    # Helper methods
+    # ---------------------------------------------------------------
+
+    async def show_menu_query(self, query):
+        """Show menu in query context"""
+        keyboard = [
+            [InlineKeyboardButton("💬 Chat", callback_data="chat")],
+            [InlineKeyboardButton("📰 News Summarizer", callback_data="news")],
+            [InlineKeyboardButton("🎬 YouTube Summarizer", callback_data="youtube")],
+            [InlineKeyboardButton("⚙️ Model Settings", callback_data="model")],
+            [InlineKeyboardButton("❓ Help", callback_data="help")],
+        ]
+        await query.edit_message_text(
+            "🤖 *Main Menu*\n\nChoose an option:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+
+    async def _show_model_info(self, query):
+        """Show model info in query context"""
+        text = (
+            f"🧠 *Model Information*\n\n"
+            f"🤖 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
+            f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
+            f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
+        )
+        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+        if query:
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
+
+    async def _show_models_list(self, query):
+        """Show models list in query context"""
+        models = await self.bot.ollama.list_models()
+        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+        if not models:
+            if query:
+                await query.edit_message_text("❌ No models found.", reply_markup=back_button)
+            return
+
+        text = "🤖 *Available Models*\n\n" + "\n".join(f"• `{m}`" for m in models)
+        if query:
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
+
+    async def _show_model_selection(self, query, context):
+        """Show model selection in query context"""
+        models = await self.bot.ollama.list_models()
+        if not models:
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+            if query:
+                await query.edit_message_text("❌ No models available.", reply_markup=back_button)
+            return
+
+        # Store models list in user_data for callback lookup
+        if context.user_data:
+            context.user_data['model_list'] = models
+
+        # Use index-based callback data to avoid length limits
+        keyboard = [
+            [InlineKeyboardButton(m, callback_data=f"setmodel:{idx}")]
+            for idx, m in enumerate(models)
+        ]
+        keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
+
+        if query:
+            await query.edit_message_text(
+                f"🤖 *Select a Model*\n\n(Current: `{self.bot.config.OLLAMA_MODEL}`)",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+    async def _show_help(self, query):
+        """Show help in query context"""
+        help_text = (
+            "❓ *Help & Commands*\n\n"
+            "• *Menu Options* - Use /start to see interactive menu\n"
+            "• *Direct Chat* - Just send any message to talk with AI\n"
+            "• *News Summarization* - Send any message with a news link to auto-summarize!\n"
+            "• *YouTube Summarization* - Send any message with a YouTube link to auto-summarize!\n\n"
+            "*Available Commands:*\n"
+            "`/start` - Show main menu\n"
+            "`/help` - This help message\n"
+            "`/menu` - Show the main menu\n"
+            "`/model` - Show current model info\n"
+            "`/listmodels` - List available models\n"
+            "`/setmodel` - Select model with buttons\n"
+            "`/timeout <seconds>` - Set request timeout (1-600)\n\n"
+            "*News Summarizer Features:*\n"
+            "📰 *Auto-Detection:* Automatically detects news URLs in messages\n"
+            "🤖 *AI-Powered:* Uses AI to create comprehensive summaries\n"
+            "🌐 *Multi-Source:* Supports 30+ major news websites\n"
+            "📊 *Structured:* Provides key points and context\n\n"
+            "*YouTube Summarizer Features:*\n"
+            "🎬 *Auto-Detection:* Automatically detects YouTube URLs in messages\n"
+            "🎥 *Video Info:* Extracts title, channel, views, duration\n"
+            "📝 *Transcript:* Pulls video transcript using YouTube API\n"
+            "🤖 *AI-Powered:* Uses AI to summarize video content\n"
+            "🎯 *Smart:* Supports all YouTube URL formats (watch, shorts, embed)"
+        )
+        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+        if query:
+            await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
