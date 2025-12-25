@@ -27,44 +27,52 @@ export OLLAMA_MODEL="llama2"
 
 echo "✅ Environment variables set"
 
-# Test import
+# Test import using a simpler approach
 echo ""
 echo "🔧 Testing bot imports..."
-if python3 -c "
+
+# Create a temporary Python test script
+cat > /tmp/test_imports.py << 'EOF'
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath('.')))
 try:
     import settings
     print('✅ Settings imported')
-    
+
     from constants import MAX_MESSAGE_LENGTH
     print('✅ Constants imported')
-    
+
     from ollama_client import OllamaClient
     print('✅ Ollama client imported')
-    
+
     from conversation import ConversationManager
     print('✅ Conversation manager imported')
-    
+
     from security import InputValidator
     print('✅ Security modules imported')
-    
+
     print('')
     print('🎉 All imports successful!')
     print('')
     print('🚀 Ready to run the bot!')
-    print('Run: export TELEGRAM_BOT_TOKEN=\"$TOKEN\" && python bot.py')
-    
+
 except Exception as e:
     print(f'❌ Import failed: {e}')
-    exit 1
-"; then
+    import sys
+    sys.exit(1)
+EOF
+
+if python3 /tmp/test_imports.py; then
     echo ""
     echo "💡 Next steps:"
     echo "1. Make sure Ollama is running: ollama list"
     echo "2. Run the bot: export TELEGRAM_BOT_TOKEN=\"$TOKEN\" && python bot.py"
     echo "3. Test on Telegram by messaging your bot!"
+
+    # Cleanup
+    rm /tmp/test_imports.py
 else
     echo "❌ Setup failed"
+    rm /tmp/test_imports.py
     exit 1
 fi
