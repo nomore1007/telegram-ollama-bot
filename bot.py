@@ -5,15 +5,26 @@ import asyncio
 import re
 import sys
 import os
-import importlib.util
 
-# Add current directory to Python path for local imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+# Load settings directly (simplest and most reliable approach)
+settings_path = os.path.join(os.path.dirname(__file__), 'settings.py')
+if os.path.exists(settings_path):
+    with open(settings_path, 'r', encoding='utf-8') as f:
+        exec(f.read(), globals())
+else:
+    raise FileNotFoundError(f"settings.py not found at {settings_path}")
 
-# Now we can import settings as a module
-import settings
+# Create a config object for compatibility
+class Config:
+    pass
+
+config = Config()
+for name in dir():
+    if not name.startswith('_') and name not in ['Config', 'config']:
+        setattr(config, name, globals()[name])
+
+# For backward compatibility
+settings = config
 
 from telegram import Update, BotCommand
 from telegram.ext import (
