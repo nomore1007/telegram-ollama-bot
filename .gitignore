@@ -45,3 +45,7 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Internal documentation (not for public repo)
+AGENTS.md
+GEMINI.md
