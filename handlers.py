@@ -42,7 +42,7 @@ class TelegramHandlers:
                 "`/menu` - Show the main menu\n"
                 "`/model` - Show current model info\n"
                 "`/listmodels` - List available models\n"
-                "`/setmodel` - Select a model\n"
+                "`/changemodel <model>` - Change AI model\n"
                 "`/setprompt` - Set custom AI prompt\n"
                 "`/timeout` - Set request timeout\n\n"
                 "🔍 *Auto Features:*\n"
@@ -65,7 +65,7 @@ class TelegramHandlers:
                 "`/menu` - Show the main menu\n"
                 "`/model` - Show current AI model info\n"
                 "`/listmodels` - List all available AI models\n"
-                "`/setmodel` - Interactive AI model selection\n"
+                "`/changemodel <model>` - Change AI model\n"
                 "`/setprompt` - Set custom AI prompt\n"
                 "`/timeout` - Set request timeout\n\n"
                 "🔍 *Auto Features:*\n"
@@ -117,28 +117,50 @@ class TelegramHandlers:
         if update.message:
             await update.message.reply_text(f"🤖 Available models:\n{text}")
 
-    async def set_model(self, update, context: CallbackContext):
-        """Handle /setmodel command"""
-        models = await self.bot.ollama.list_models()
-        if not models:
+    async def change_model(self, update, context: CallbackContext):
+        """Handle /changemodel command"""
+        if not context.args or len(context.args) == 0:
+            # Show available models if no argument provided
+            models = await self.bot.ollama.list_models()
+            if not models:
+                if update.message:
+                    await update.message.reply_text("❌ No models available.")
+                return
+
+            model_list = "\n".join(f"• `{m}`" for m in models)
             if update.message:
-                await update.message.reply_text("❌ No models available.")
+                await update.message.reply_text(
+                    f"🤖 Available models:\n{model_list}\n\n"
+                    f"💡 Usage: `/changemodel <model_name>`\n"
+                    f"📍 Current: `{self.bot.config.OLLAMA_MODEL}`",
+                    parse_mode="Markdown"
+                )
             return
 
-        # Store models list in user_data for callback lookup
-        if context.user_data:
-            context.user_data['model_list'] = models
+        # Get the requested model name
+        requested_model = " ".join(context.args)
 
-        # Use index-based callback data to avoid length limits
-        keyboard = [
-            [InlineKeyboardButton(m, callback_data=f"setmodel:{idx}")]
-            for idx, m in enumerate(models)
-        ]
+        # Validate the model exists
+        models = await self.bot.ollama.list_models()
+        if requested_model not in models:
+            if update.message:
+                await update.message.reply_text(
+                    f"❌ Model `{requested_model}` not found.\n\n"
+                    f"📋 Available models:\n" + "\n".join(f"• `{m}`" for m in models[:10]) +
+                    (f"\n... and {len(models)-10} more" if len(models) > 10 else ""),
+                    parse_mode="Markdown"
+                )
+            return
+
+        # Update the model
+        self.bot.config.OLLAMA_MODEL = requested_model
+        self.bot.ollama.model = requested_model
 
         if update.message:
             await update.message.reply_text(
-                f"🤖 Select a model:\n(Current: {self.bot.config.OLLAMA_MODEL})",
-                reply_markup=InlineKeyboardMarkup(keyboard),
+                f"✅ Model changed to: `{requested_model}`\n\n"
+                f"🧠 The bot will now use this model for AI responses.",
+                parse_mode="Markdown"
             )
 
     async def set_timeout(self, update, context: CallbackContext):
@@ -261,7 +283,7 @@ class TelegramHandlers:
             keyboard = [
                 [InlineKeyboardButton("Show Info", callback_data="model_info")],
                 [InlineKeyboardButton("List Models", callback_data="listmodels")],
-                [InlineKeyboardButton("Set Model", callback_data="setmodel")],
+                [InlineKeyboardButton("Change Model", callback_data="changemodel")],
                 [InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")],
             ]
             await query.edit_message_text(
@@ -271,7 +293,7 @@ class TelegramHandlers:
             )
         elif action == "listmodels":
             await self._show_models_list(query)
-        elif action == "setmodel":
+        elif action == "changemodel":
             await self._show_model_selection(query, context)
         elif action == "model_info":
             await self._show_model_info(query)
@@ -304,6 +326,8 @@ class TelegramHandlers:
                 await query.edit_message_text("❌ Invalid callback data.")
                 return
 
+            logger.info(f"Model callback received: {query.data}")
+
             # Parse index from callback data
             model_idx = int(query.data.split(":", 1)[1])
 
@@ -311,13 +335,18 @@ class TelegramHandlers:
             model_list = []
             if context.user_data:
                 model_list = context.user_data.get('model_list', [])
+                logger.info(f"Found model_list in user_data: {len(model_list)} models")
+            else:
+                logger.warning("No user_data available in context")
 
             # Validate index
             if not model_list or not (0 <= model_idx < len(model_list)):
-                await query.edit_message_text("❌ Model selection expired. Please use /setmodel again.")
+                logger.error(f"Invalid model index {model_idx}, model_list length: {len(model_list)}")
+                await query.edit_message_text("❌ Model selection expired. Please use /changemodel again.")
                 return
 
             model_name = model_list[model_idx]
+            logger.info(f"Selected model: {model_name}")
 
             self.bot.config.OLLAMA_MODEL = model_name
             self.bot.ollama.model = model_name
@@ -389,10 +418,13 @@ class TelegramHandlers:
         # Store models list in user_data for callback lookup
         if context.user_data:
             context.user_data['model_list'] = models
+            logger.info(f"Stored {len(models)} models in user_data for model selection")
+        else:
+            logger.warning("No user_data available to store model list")
 
         # Use index-based callback data to avoid length limits
         keyboard = [
-            [InlineKeyboardButton(m, callback_data=f"setmodel:{idx}")]
+            [InlineKeyboardButton(m, callback_data=f"changemodel:{idx}")]
             for idx, m in enumerate(models)
         ]
         keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
@@ -418,7 +450,7 @@ class TelegramHandlers:
             "`/menu` - Show the main menu\n"
             "`/model` - Show current model info\n"
             "`/listmodels` - List available models\n"
-            "`/setmodel` - Select model with buttons\n"
+            "`/changemodel <model>` - Change AI model\n"
             "`/timeout <seconds>` - Set request timeout (1-600)\n\n"
             "*News Summarizer Features:*\n"
             "📰 *Auto-Detection:* Automatically detects news URLs in messages\n"

@@ -216,7 +216,7 @@ class TelegramOllamaBot:
             BotCommand("menu", "Show the main menu"),
             BotCommand("model", "Show current AI model info"),
             BotCommand("listmodels", "List all available AI models"),
-            BotCommand("setmodel", "Interactive AI model selection"),
+            BotCommand("changemodel", "Change AI model"),
             BotCommand("setprompt", "Set custom AI prompt"),
             BotCommand("timeout", "Set request timeout"),
         ]
@@ -237,13 +237,13 @@ class TelegramOllamaBot:
         app.add_handler(CommandHandler("menu", self.handlers.show_menu))
         app.add_handler(CommandHandler("model", self.handlers.model_info))
         app.add_handler(CommandHandler("listmodels", self.handlers.list_models_cmd))
-        app.add_handler(CommandHandler("setmodel", self.handlers.set_model))
+        app.add_handler(CommandHandler("changemodel", self.handlers.change_model))
         app.add_handler(CommandHandler("setprompt", self.handlers.set_prompt))
         app.add_handler(CommandHandler("timeout", self.handlers.set_timeout))
 
         # Callback query handlers
         app.add_handler(
-            CallbackQueryHandler(self.handlers.model_callback, pattern=r"^setmodel:")
+            CallbackQueryHandler(self.handlers.model_callback, pattern=r"^changemodel:")
         )
         app.add_handler(CallbackQueryHandler(self.handlers.menu_callback))
 
