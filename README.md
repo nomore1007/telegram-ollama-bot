@@ -22,10 +22,19 @@ A multi-platform AI assistant bot supporting Telegram and Discord, with pluggabl
 ### 1. Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/nomore1007/telegram-ollama-bot.git
 cd telegram-ollama-bot
+
+# Create virtual environment (recommended)
+python -m venv bot_env
+source bot_env/bin/activate  # On Windows: bot_env\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
+
+**Note:** Never commit virtual environments (`bot_env/`, `venv/`, etc.) to Git. They are platform-specific and can contain sensitive data. Each developer should create their own virtual environment locally.
 
 ### 2. Configuration
 
@@ -104,6 +113,33 @@ export TELEGRAM_BOT_TOKEN="your_token"
 export LLM_PROVIDER="openai"
 export OPENAI_API_KEY="sk-..."
 export ADMIN_USER_IDS="123456789"
+```
+
+### Environment File (.env)
+
+For convenience, you can create a `.env` file in the project root:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit with your configuration
+nano .env
+```
+
+**Security Note:** The `.env` file contains sensitive information (API keys, tokens, passwords) and is automatically ignored by Git. **Never commit `.env` files or any files containing sensitive credentials to version control.**
+
+**Important Security Practices:**
+- ✅ Use `.env.example` as a template (it contains no sensitive data)
+- ✅ Set restrictive file permissions: `chmod 600 .env`
+- ✅ Never share `.env` files or commit them to Git
+- ✅ Use environment variables in production deployments
+- ✅ Regularly rotate API keys and tokens
+
+**File permissions:**
+```bash
+# Set restrictive permissions on .env file
+chmod 600 .env
 ```
 
 ## 🤖 Commands

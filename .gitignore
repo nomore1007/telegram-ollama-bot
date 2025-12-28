@@ -19,10 +19,25 @@ wheels/
 .installed.cfg
 *.egg
 
-# Settings
+# Settings and Configuration (NEVER COMMIT SENSITIVE DATA)
 settings.py
 .env
 .env.local
+.env.*
+!.env.example
+
+# API Keys and Tokens (ALWAYS IGNORE)
+*key*
+*token*
+*secret*
+*password*
+*credential*
+
+# Configuration files with sensitive data
+config.json
+config.yml
+config.yaml
+secrets.json
 
 # Virtual environments
 .env
@@ -31,6 +46,7 @@ env/
 ENV/
 env.bak/
 venv.bak/
+bot_env/
 
 # Logs
 *.log
