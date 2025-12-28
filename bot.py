@@ -6,36 +6,8 @@ import re
 import sys
 import os
 
-# Load settings directly (check multiple possible locations)
-settings_locations = [
-    os.path.join(os.path.dirname(__file__), 'settings.py'),  # Same directory as bot.py
-    os.path.join(os.getcwd(), 'settings.py'),               # Current working directory
-    'settings.py'                                            # Relative path
-]
-
-settings_loaded = False
-for settings_path in settings_locations:
-    if os.path.exists(settings_path):
-        print(f"Loading settings from: {settings_path}")
-        with open(settings_path, 'r', encoding='utf-8') as f:
-            exec(f.read(), globals())
-        settings_loaded = True
-        break
-
-if not settings_loaded:
-    raise FileNotFoundError(f"settings.py not found. Checked locations: {settings_locations}")
-
-# Create a config object for compatibility
-class Config:
-    pass
-
-config = Config()
-for name in dir():
-    if not name.startswith('_') and name not in ['Config', 'config']:
-        setattr(config, name, globals()[name])
-
-# For backward compatibility
-settings = config
+# Load settings using the settings manager
+from settings_manager import settings_manager, settings, config
 
 from telegram import Update, BotCommand
 from telegram.ext import (
