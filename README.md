@@ -310,8 +310,111 @@ ENABLED_PLUGINS = "telegram,discord,myplugin"
 - **Dependencies**: Plugins can require other plugins
 - **Configuration**: Per-plugin settings with validation
 - **Lifecycle**: Proper initialization and cleanup
-- **Metadata**: Version, description, and help text
 - **Event Hooks**: Commands, messages, callbacks
+
+## 🔌 Suggested Additional Plugins
+
+### 1. **Image Generation Plugin** (`plugins/image_gen_plugin.py`)
+**Purpose:** Generate images using AI models
+**Commands:** `/generate <prompt>`, `/imagine <description>`
+**Dependencies:** `openai`, `replicate` (optional)
+**Use Cases:** Create artwork, diagrams, memes, visualizations
+**Example:** `/generate a serene mountain landscape at sunset`
+
+### 2. **Code Analysis Plugin** (`plugins/code_plugin.py`)
+**Purpose:** AI-powered code review and analysis
+**Commands:** `/review <code>`, `/explain <code>`, `/optimize <code>`
+**Dependencies:** LLM providers
+**Use Cases:** Code explanation, optimization suggestions, bug detection
+**Example:** `/review def factorial(n): return n * factorial(n-1)`
+
+### 3. **Translation Plugin** (`plugins/translate_plugin.py`)
+**Purpose:** Multi-language translation capabilities
+**Commands:** `/translate <text> to <language>`, `/detect <text>`
+**Dependencies:** `googletrans`, `deep-translator`
+**Use Cases:** Language learning, international communication
+**Example:** `/translate Hello world to Spanish`
+
+### 4. **Voice/Speech Plugin** (`plugins/voice_plugin.py`)
+**Purpose:** Voice message processing and text-to-speech
+**Commands:** `/voice <text>`, `/transcribe` (with voice message)
+**Dependencies:** `speechrecognition`, `gTTS`, `pydub`
+**Use Cases:** Voice commands, audio transcription, accessibility
+**Example:** `/voice Welcome to our community!`
+
+### 5. **Database Plugin** (`plugins/database_plugin.py`)
+**Purpose:** Persistent storage and data management
+**Commands:** `/store <key> <value>`, `/retrieve <key>`, `/list`
+**Dependencies:** `sqlite3`, `sqlalchemy`
+**Use Cases:** User preferences, conversation history, custom data storage
+**Example:** `/store my_preference dark_mode`
+
+### 6. **Analytics Plugin** (`plugins/analytics_plugin.py`)
+**Purpose:** Usage statistics and performance monitoring
+**Commands:** `/stats`, `/usage`, `/performance` (admin only)
+**Dependencies:** `matplotlib`, `pandas`
+**Use Cases:** Monitor bot usage, generate reports, track performance
+**Example:** `/stats` shows message counts, popular commands, response times
+
+### 7. **Social Media Plugin** (`plugins/social_plugin.py`)
+**Purpose:** Social media integration and posting
+**Commands:** `/post <platform> <content>`, `/schedule <content>`
+**Dependencies:** `tweepy`, `facebook-sdk`, `instagram-api`
+**Use Cases:** Automated social media posting, content scheduling
+**Example:** `/post twitter Check out this amazing AI bot!`
+
+### 8. **Calendar/Scheduling Plugin** (`plugins/calendar_plugin.py`)
+**Purpose:** Calendar management and reminders
+**Commands:** `/remind <time> <message>`, `/schedule <event>`, `/calendar`
+**Dependencies:** `google-api-python-client`, `icalendar`
+**Use Cases:** Meeting reminders, event scheduling, time management
+**Example:** `/remind tomorrow 2pm Team meeting`
+
+### 9. **File Processing Plugin** (`plugins/file_plugin.py`)
+**Purpose:** Document and file analysis
+**Commands:** `/analyze <file>`, `/summarize <document>`, `/convert <file>`
+**Dependencies:** `PyPDF2`, `python-docx`, `pandas`
+**Use Cases:** Document summarization, file format conversion, data analysis
+**Example:** `/summarize` (with PDF attachment)
+
+### 10. **Entertainment Plugin** (`plugins/entertainment_plugin.py`)
+**Purpose:** Games, quizzes, and fun interactions
+**Commands:** `/quiz`, `/joke`, `/trivia`, `/game <type>`
+**Dependencies:** `random`, `requests` (for APIs)
+**Use Cases:** User engagement, entertainment, icebreakers
+**Example:** `/quiz` starts an interactive quiz session
+
+### Plugin Development Template
+
+```python
+from plugins.base import Plugin
+
+class MyCustomPlugin(Plugin):
+    def __init__(self, name: str, config=None):
+        super().__init__(name, config)
+
+    def get_dependencies(self):
+        return []  # List required plugins
+
+    def get_description(self):
+        return "Description of what this plugin does"
+
+    def get_config_schema(self):
+        return {
+            "api_key": {"type": "string", "required": True},
+            "max_retries": {"type": "integer", "default": 3}
+        }
+
+    def initialize(self, bot_instance):
+        super().initialize(bot_instance)
+        # Setup code here
+
+    def get_commands(self):
+        return ["mycommand"]
+
+    async def handle_mycommand(self, update, context):
+        await update.message.reply_text("Plugin response!")
+```
 
 ## 🛡️ Security Features
 
