@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from plugins import PluginManager
+    from plugins import plugin_manager, PluginManager
     from plugins.base import Plugin
     from plugins.telegram_plugin import TelegramPlugin
     from plugins.web_search_plugin import WebSearchPlugin
@@ -21,6 +21,7 @@ try:
 except ImportError as e:
     print(f"Import error: {e}")
     # For testing without full imports
+    plugin_manager = None
     PluginManager = None
     Plugin = object
     TelegramPlugin = object
