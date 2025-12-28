@@ -268,7 +268,7 @@ class TelegramOllamaBot:
                     # Create a closure to ensure correct plugin instance binding
                     async def plugin_handler(update, context, plugin=plugin, method=handler_method):
                         try:
-                            return await method(update, context)
+                            return await method(plugin, update, context)
                         except AttributeError as e:
                             logger.error(f"Plugin handler error for {command}: {e}")
                             if update.message:
