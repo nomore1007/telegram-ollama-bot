@@ -430,7 +430,7 @@ class TelegramPlugin(Plugin):
             logger.info(f"Selected model: {model_name}")
 
             self.bot_instance.config.OLLAMA_MODEL = model_name
-            self.bot_instance.ollama.model = model_name
+            self.bot_instance.llm.set_model(model_name)
 
             await query.edit_message_text(
                 f"✅ Model updated to:\n`{model_name}`",
