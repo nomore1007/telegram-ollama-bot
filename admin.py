@@ -13,23 +13,59 @@ class AdminManager:
 
     def __init__(self, admin_user_ids: Optional[List[int]] = None):
         self.admin_user_ids = set(admin_user_ids or [])
+        self.allow_initial_setup = len(self.admin_user_ids) == 0  # Allow setup if no admins exist
 
     def is_admin(self, user_id: int) -> bool:
         """Check if a user is an administrator."""
         return user_id in self.admin_user_ids
 
-    def add_admin(self, user_id: int, requesting_user_id: int) -> bool:
-        """Add a new admin. Only existing admins can do this."""
-        if not self.is_admin(requesting_user_id):
+    def add_admin(self, user_id: int, requesting_user_id: Optional[int] = None, force: bool = False) -> bool:
+        """Add a new admin.
+
+        Args:
+            user_id: The user ID to add as admin
+            requesting_user_id: User ID making the request (None for initial setup)
+            force: Force add without permission checks (for CLI/setup use)
+        """
+        # Allow initial setup if no admins exist
+        if self.allow_initial_setup and requesting_user_id is None:
+            self.admin_user_ids.add(user_id)
+            self.allow_initial_setup = len(self.admin_user_ids) == 0  # Update flag
+            logger.info(f"Added initial admin: {user_id}")
+            return True
+
+        # Force add (for CLI/admin scripts)
+        if force:
+            self.admin_user_ids.add(user_id)
+            logger.info(f"Force added admin: {user_id}")
+            return True
+
+        # Normal admin check
+        if requesting_user_id is None or not self.is_admin(requesting_user_id):
             return False
 
         self.admin_user_ids.add(user_id)
         logger.info(f"Added admin: {user_id}")
         return True
 
-    def remove_admin(self, user_id: int, requesting_user_id: int) -> bool:
-        """Remove an admin. Only existing admins can do this."""
-        if not self.is_admin(requesting_user_id):
+    def remove_admin(self, user_id: int, requesting_user_id: Optional[int] = None, force: bool = False) -> bool:
+        """Remove an admin.
+
+        Args:
+            user_id: The user ID to remove from admins
+            requesting_user_id: User ID making the request (None for CLI)
+            force: Force remove without permission checks (for CLI/admin scripts)
+        """
+        # Force remove (for CLI/admin scripts)
+        if force:
+            if user_id in self.admin_user_ids:
+                self.admin_user_ids.discard(user_id)
+                logger.info(f"Force removed admin: {user_id}")
+                return True
+            return False
+
+        # Normal admin check
+        if requesting_user_id is None or not self.is_admin(requesting_user_id):
             return False
 
         # Prevent removing the last admin

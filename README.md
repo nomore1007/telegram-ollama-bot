@@ -69,6 +69,32 @@ python bot.py
 | `TIMEOUT` | Request timeout (seconds) | `30` | `60` |
 | `DEFAULT_PROMPT` | System prompt for AI | Custom prompt | - |
 
+### Admin Setup
+
+**Initial Admin Configuration:**
+```bash
+# Method 1: Direct settings file edit
+ADMIN_USER_IDS: list = [123456789]  # Your Telegram user ID
+
+# Method 2: Using the admin CLI (recommended)
+python admin_cli.py setup 123456789
+```
+
+**Admin Management CLI:**
+```bash
+# Add an admin
+python admin_cli.py add 987654321
+
+# Remove an admin
+python admin_cli.py remove 987654321
+
+# List all admins
+python admin_cli.py list
+
+# Use custom settings file
+python admin_cli.py --settings my_settings.py add 123456789
+```
+
 ### Environment Variables
 
 All settings can be configured via environment variables:
@@ -118,6 +144,24 @@ export ADMIN_USER_IDS="123456789"
 | `/addadmin <user_id>` | Add new administrator |
 | `/removeadmin <user_id>` | Remove administrator |
 | `/listadmins` | Show all administrators |
+
+### Admin Management CLI
+
+For initial setup and external admin management:
+
+```bash
+# Initial admin setup (run once)
+python admin_cli.py setup YOUR_TELEGRAM_USER_ID
+
+# Add additional admins
+python admin_cli.py add USER_ID
+
+# Remove admins
+python admin_cli.py remove USER_ID
+
+# List current admins
+python admin_cli.py list
+```
 
 ### Discord Commands
 
@@ -574,6 +618,12 @@ ENABLED_PLUGINS = "telegram,discord,myplugin"
 - Check if web_search plugin is enabled in ENABLED_PLUGINS
 - Verify search query is not empty or too short
 - Some regions may have search restrictions
+
+**Admin setup issues:**
+- Use `python admin_cli.py setup YOUR_USER_ID` for initial admin setup
+- Check that ADMIN_USER_IDS is properly configured in settings.py
+- Ensure your user ID is correct (use `/userid` command once bot is running)
+- Use `python admin_cli.py list` to verify admin configuration
 
 **Plugin loading issues:**
 - Check `ENABLED_PLUGINS` configuration
