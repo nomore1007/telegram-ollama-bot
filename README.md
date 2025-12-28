@@ -38,12 +38,19 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-Copy and edit the settings file:
+**Quick Setup:**
 ```bash
+# Run the setup script to create settings.py
+python setup.py
+```
+
+**Manual Setup:**
+```bash
+# Copy and edit the settings file
 cp settings.example.py settings.py
 ```
 
-Configure your preferred settings in `settings.py` or use environment variables.
+Configure your settings in `settings.py` or use environment variables. The bot will automatically load `settings.py` (your configuration) or fall back to `settings.example.py` (defaults).
 
 ### 3. Run the Bot
 
@@ -106,14 +113,26 @@ python admin_cli.py --settings my_settings.py add 123456789
 
 ### Environment Variables
 
-All settings can be configured via environment variables:
+All settings can be configured via environment variables or `.env` file:
 
+**Environment Variables:**
 ```bash
 export TELEGRAM_BOT_TOKEN="your_token"
 export LLM_PROVIDER="openai"
 export OPENAI_API_KEY="sk-..."
 export ADMIN_USER_IDS="123456789"
 ```
+
+**Or create a `.env` file:**
+```bash
+cp .env.example .env
+# Edit .env with your values
+```
+
+The bot loads settings in this priority order:
+1. `settings.py` (your custom configuration)
+2. Environment variables (`.env` file or system env)
+3. `settings.example.py` (fallback defaults)
 
 ### Environment File (.env)
 
