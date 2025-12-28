@@ -20,13 +20,50 @@ class Plugin(ABC):
     def __init__(self, name: str, config: Optional[Dict[str, Any]] = None):
         self.name = name
         self.config = config or {}
+        self.bot_instance = None
+        self.logger = None
+
+    def get_dependencies(self) -> List[str]:
+        """
+        Return a list of plugin names this plugin depends on.
+        These plugins will be loaded before this one.
+        """
+        return []
+
+    def get_version(self) -> str:
+        """
+        Return the plugin version.
+        """
+        return "1.0.0"
+
+    def get_description(self) -> str:
+        """
+        Return a description of what this plugin does.
+        """
+        return "A plugin for the Deepthought Bot"
+
+    def validate_config(self) -> bool:
+        """
+        Validate the plugin configuration.
+        Return True if valid, False otherwise.
+        """
+        return True
+
+    def get_config_schema(self) -> Dict[str, Any]:
+        """
+        Return a schema describing the expected configuration options.
+        """
+        return {}
 
     @abstractmethod
     def initialize(self, bot_instance) -> None:
         """
         Called when the plugin is loaded. Use this to set up any necessary state.
         """
-        pass
+        self.bot_instance = bot_instance
+        # Set up logger
+        import logging
+        self.logger = logging.getLogger(f"plugin.{self.name}")
 
     def on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE, bot_instance) -> Optional[str]:
         """

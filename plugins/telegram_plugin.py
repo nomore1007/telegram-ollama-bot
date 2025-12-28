@@ -6,7 +6,8 @@ This plugin handles all Telegram-specific functionality including commands, menu
 
 import logging
 import hashlib
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+from personality import Personality, personality_manager
 
 from telegram import (
     Update,
@@ -18,6 +19,7 @@ from telegram.ext import ContextTypes
 
 from .base import Plugin
 from constants import MAX_MESSAGE_LENGTH
+from admin import require_admin
 
 
 def anonymize_user_id(user_id: int) -> str:
@@ -33,32 +35,62 @@ class TelegramPlugin(Plugin):
 
     def __init__(self, name: str, config: Optional[dict] = None):
         super().__init__(name, config)
-        self.bot_instance_instance = None
+
+    def get_dependencies(self) -> List[str]:
+        """Telegram plugin depends on core bot functionality."""
+        return []
+
+    def get_description(self) -> str:
+        """Return plugin description."""
+        return "Telegram bot interface with commands, menus, and admin controls"
+
+    def get_config_schema(self) -> Dict[str, Any]:
+        """Return configuration schema."""
+        return {
+            "admin_required_commands": {
+                "type": "list",
+                "default": ["changemodel", "setprompt", "timeout", "addadmin", "removeadmin"],
+                "description": "Commands that require admin privileges"
+            }
+        }
 
     def initialize(self, bot_instance) -> None:
         """Initialize the plugin with the bot instance."""
-        self.bot_instance_instance = bot_instance
+        super().initialize(bot_instance)
+        self.bot_instance = bot_instance
         logger.info("Telegram plugin initialized")
 
     def get_commands(self) -> List[str]:
         """Return list of commands this plugin handles."""
         return [
             "start", "help", "menu", "model", "listmodels", "changemodel",
-            "setprompt", "timeout"
+            "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
+            "personality", "setpersonality", "clear"
         ]
 
     def get_help_text(self) -> str:
         """Return help text for this plugin."""
         return (
             "🤖 *Telegram Bot Commands*\n\n"
+            "**Basic Commands:**\n"
             "`/start` - Show welcome message and commands\n"
             "`/help` - Show this help message\n"
             "`/menu` - Show the main menu\n"
+            "`/userid` - Show your Telegram user ID\n\n"
+            "**Conversation:**\n"
+            "`/clear` - Clear conversation history\n"
+            "`/personality` - Show available bot personalities\n"
+            "`/setpersonality <name>` - Change bot personality\n\n"
+            "**AI Configuration (Admin Only):**\n"
             "`/model` - Show current AI model info\n"
             "`/listmodels` - List all available AI models\n"
             "`/changemodel <model>` - Change AI model\n"
             "`/setprompt` - Set custom AI prompt\n"
-            "`/timeout` - Set request timeout"
+            "`/timeout` - Set request timeout\n\n"
+            "**Admin Management (Admin Only):**\n"
+            "`/addadmin <user_id>` - Add new administrator\n"
+            "`/removeadmin <user_id>` - Remove administrator\n"
+            "`/listadmins` - List all administrators"
         )
 
     def on_command(self, update, context: ContextTypes.DEFAULT_TYPE, command: str, bot_instance) -> Optional[str]:
@@ -155,6 +187,7 @@ class TelegramPlugin(Plugin):
         if update.message:
             await update.message.reply_text(f"🤖 Available models:\n{text}")
 
+    @require_admin
     async def handle_changemodel(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /changemodel command"""
         if not context.args or len(context.args) == 0:
@@ -201,6 +234,7 @@ class TelegramPlugin(Plugin):
                 parse_mode="Markdown"
             )
 
+    @require_admin
     async def handle_timeout(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /timeout command"""
         try:
@@ -223,6 +257,7 @@ class TelegramPlugin(Plugin):
                     "❌ Usage: /timeout <seconds> (1–600)"
                 )
 
+    @require_admin
     async def handle_setprompt(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /setprompt command"""
         try:
@@ -347,6 +382,7 @@ class TelegramPlugin(Plugin):
         else:
             await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
 
+    @require_admin
     async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle model selection callbacks"""
         query = update.callback_query
@@ -499,3 +535,146 @@ class TelegramPlugin(Plugin):
         back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
         if query:
             await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
+
+    async def handle_userid(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /userid command - shows user's Telegram ID"""
+        user_id = update.effective_user.id if update.effective_user else "Unknown"
+        if update.message:
+            await update.message.reply_text(
+                f"🆔 *Your Telegram User ID:*\n`{user_id}`\n\n"
+                "💡 *Use this ID for admin management commands like `/addadmin {user_id}`*",
+                parse_mode="Markdown"
+            )
+
+    @require_admin
+    async def handle_addadmin(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /addadmin command"""
+        if not context.args or len(context.args) == 0:
+            if update.message:
+                await update.message.reply_text(
+                    "❌ Usage: `/addadmin <user_id>`\n\n"
+                    "💡 Find user ID by using `/userid` or checking bot logs",
+                    parse_mode="Markdown"
+                )
+            return
+
+        try:
+            new_admin_id = int(context.args[0])
+            requesting_user_id = update.effective_user.id
+
+            if self.bot.admin_manager.add_admin(new_admin_id, requesting_user_id):
+                if update.message:
+                    await update.message.reply_text(f"✅ Added user {new_admin_id} as administrator.")
+            else:
+                if update.message:
+                    await update.message.reply_text("❌ Failed to add admin. You must be an admin to do this.")
+
+        except ValueError:
+            if update.message:
+                await update.message.reply_text("❌ Invalid user ID. Must be a number.")
+
+    @require_admin
+    async def handle_removeadmin(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /removeadmin command"""
+        if not context.args or len(context.args) == 0:
+            if update.message:
+                await update.message.reply_text(
+                    "❌ Usage: `/removeadmin <user_id>`\n\n"
+                    "⚠️ Cannot remove the last administrator.",
+                    parse_mode="Markdown"
+                )
+            return
+
+        try:
+            admin_id = int(context.args[0])
+            requesting_user_id = update.effective_user.id
+
+            if self.bot.admin_manager.remove_admin(admin_id, requesting_user_id):
+                if update.message:
+                    await update.message.reply_text(f"✅ Removed user {admin_id} from administrators.")
+            else:
+                if update.message:
+                    await update.message.reply_text("❌ Failed to remove admin. Check permissions or ensure at least one admin remains.")
+
+        except ValueError:
+            if update.message:
+                await update.message.reply_text("❌ Invalid user ID. Must be a number.")
+
+    @require_admin
+    async def handle_listadmins(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /listadmins command"""
+        admins = self.bot.admin_manager.get_admins()
+        if not admins:
+            admin_list = "No administrators configured."
+        else:
+            admin_list = "\n".join(f"• `{admin_id}`" for admin_id in admins)
+
+        if update.message:
+                await update.message.reply_text(
+                    f"👑 *Bot Administrators*\n\n{admin_list}",
+                    parse_mode="Markdown"
+                )
+
+    async def handle_personality(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /personality command - show available personalities"""
+        personalities = personality_manager.list_personalities()
+
+        personality_list = "\n".join(
+            f"• `{key}` - {info['description']}"
+            for key, info in personalities.items()
+        )
+
+        current = self.bot_instance.personality.value if hasattr(self.bot_instance, 'personality') else 'helpful'
+
+        if update.message:
+            await update.message.reply_text(
+                f"🎭 *Bot Personalities*\n\n"
+                f"**Current:** `{current}`\n\n"
+                f"**Available:**\n{personality_list}\n\n"
+                f"💡 Use `/setpersonality <name>` to change",
+                parse_mode="Markdown"
+            )
+
+    async def handle_setpersonality(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setpersonality command"""
+        if not context.args or len(context.args) == 0:
+            await self.handle_personality(update, context)
+            return
+
+        personality_name = context.args[0].lower()
+        available = personality_manager.list_personalities()
+
+        if personality_name not in available:
+            if update.message:
+                await update.message.reply_text(
+                    f"❌ Personality `{personality_name}` not found.\n\n"
+                    f"Available: {', '.join(available.keys())}",
+                    parse_mode="Markdown"
+                )
+            return
+
+        try:
+            new_personality = Personality(personality_name)
+            self.bot_instance.personality = new_personality
+
+            if update.message:
+                await update.message.reply_text(
+                    f"✅ *Personality Changed!*\n\n"
+                    f"🎭 Now using: `{personality_name}`\n"
+                    f"📝 {available[personality_name]['description']}",
+                    parse_mode="Markdown"
+                )
+        except ValueError as e:
+            if update.message:
+                await update.message.reply_text(f"❌ Error setting personality: {e}")
+
+    async def handle_clear(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /clear command - clear conversation history"""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if chat_id:
+            self.bot_instance.conversation_manager.clear_conversation(chat_id)
+            if update.message:
+                await update.message.reply_text("🧹 *Conversation history cleared!*", parse_mode="Markdown")
+        else:
+            if update.message:
+                await update.message.reply_text("❌ Unable to clear conversation.")

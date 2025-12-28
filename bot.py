@@ -55,6 +55,8 @@ from summarizers import NewsSummarizer, YouTubeSummarizer
 from handlers import TelegramHandlers
 from conversation import ConversationManager
 from security import InputValidator, RateLimiter
+from admin import AdminManager
+from personality import Personality, personality_manager
 from plugins import plugin_manager
 from plugins.telegram_plugin import TelegramPlugin
 from plugins.web_search_plugin import WebSearchPlugin
@@ -90,7 +92,7 @@ class TelegramOllamaBot:
 
         if llm_provider == 'ollama':
             llm_kwargs['host'] = getattr(config, 'OLLAMA_HOST', 'http://localhost:11434')
-        elif llm_provider in ['openai', 'groq']:
+        elif llm_provider in ['openai', 'groq', 'together', 'huggingface', 'anthropic']:
             api_key = getattr(config, f'{llm_provider.upper()}_API_KEY', None)
             if api_key:
                 llm_kwargs['api_key'] = api_key
@@ -107,6 +109,13 @@ class TelegramOllamaBot:
         self.rate_limiter = RateLimiter()
         self.custom_prompt = getattr(config, 'DEFAULT_PROMPT', "You are a helpful AI assistant.")
         self.bot_username = None
+        self.admin_manager = AdminManager(getattr(config, 'ADMIN_USER_IDS', []))
+        personality_name = getattr(config, 'DEFAULT_PERSONALITY', 'helpful')
+        try:
+            self.personality = Personality(personality_name)
+        except ValueError:
+            logger.warning(f"Invalid personality '{personality_name}', using 'helpful'")
+            self.personality = Personality.HELPFUL
 
         # Initialize plugins
         self._load_plugins()
@@ -239,7 +248,9 @@ class TelegramOllamaBot:
             self.conversation_manager.add_user_message(chat_id, message_text)
 
             # Get conversation context
-            context = self.conversation_manager.get_context(chat_id, self.custom_prompt)
+            # Build prompt with personality
+            personality_prompt = personality_manager.get_system_prompt(self.personality, self.custom_prompt)
+            context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
             # Generate response with full context
             response = await self.llm.generate(context)

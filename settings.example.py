@@ -23,13 +23,22 @@ DEFAULT_PROMPT: str = os.getenv(
 # Plugin configuration
 ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "telegram,web_search,discord").split(",")
 
+# Admin configuration
+ADMIN_USER_IDS: list = [int(uid.strip()) for uid in os.getenv("ADMIN_USER_IDS", "").split(",") if uid.strip()]
+
 # Discord configuration
 DISCORD_BOT_TOKEN: Optional[str] = os.getenv("DISCORD_BOT_TOKEN")
 
+# Personality configuration
+DEFAULT_PERSONALITY: str = os.getenv("DEFAULT_PERSONALITY", "helpful")  # friendly, professional, humorous, helpful, creative, concise
+
 # LLM Provider configuration
-LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")  # ollama, openai, groq
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")  # ollama, openai, groq, together, huggingface, anthropic
 OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
 GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
+TOGETHER_API_KEY: Optional[str] = os.getenv("TOGETHER_API_KEY")
+HUGGINGFACE_API_KEY: Optional[str] = os.getenv("HUGGINGFACE_API_KEY")
+ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
 # Validate required settings
 if not TELEGRAM_BOT_TOKEN:

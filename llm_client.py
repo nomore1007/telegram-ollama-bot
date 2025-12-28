@@ -192,6 +192,169 @@ class GroqProvider(LLMProvider):
             return ["llama2-70b-4096", "mixtral-8x7b-32768"]  # Fallback
 
 
+class TogetherProvider(LLMProvider):
+    """Together AI provider"""
+
+    def __init__(self, api_key: str, timeout: int = 30):
+        super().__init__(timeout)
+        self.api_key = api_key
+        self.base_url = "https://api.together.xyz/v1"
+
+    async def generate(self, prompt: str, model: str = "mistralai/Mixtral-8x7B-Instruct-v0.1", **kwargs) -> str:
+        """Generate response with Together AI"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": model,
+                "prompt": prompt,  # Together AI uses prompt directly, not messages
+                "max_tokens": kwargs.get('max_tokens', 1000),
+                "temperature": kwargs.get('temperature', 0.7),
+                "top_p": kwargs.get('top_p', 0.7),
+                "top_k": kwargs.get('top_k', 50),
+                "repetition_penalty": kwargs.get('repetition_penalty', 1.0)
+            }
+
+            response = await asyncio.to_thread(
+                requests.post,
+                f"{self.base_url}/completions",
+                headers=headers,
+                json=data,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["choices"][0]["text"]
+        except requests.RequestException as e:
+            logger.error(f"Together AI generate error: {e}")
+            return "❌ Error communicating with Together AI."
+
+    async def list_models(self) -> list[str]:
+        """List available Together AI models"""
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            response = await asyncio.to_thread(
+                requests.get,
+                f"{self.base_url}/models",
+                headers=headers,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            data = response.json()
+            models = [m["id"] for m in data if not m.get("deprecated", False)]
+            return models
+        except requests.RequestException as e:
+            logger.error(f"Together AI list models error: {e}")
+            return ["mistralai/Mixtral-8x7B-Instruct-v0.1", "meta-llama/Llama-2-70b-chat-hf"]  # Fallback
+
+
+class HuggingFaceProvider(LLMProvider):
+    """Hugging Face Inference API provider"""
+
+    def __init__(self, api_key: str, timeout: int = 30):
+        super().__init__(timeout)
+        self.api_key = api_key
+        self.base_url = "https://api-inference.huggingface.co/models"
+
+    async def generate(self, prompt: str, model: str = "microsoft/DialoGPT-medium", **kwargs) -> str:
+        """Generate response with Hugging Face"""
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            data = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": kwargs.get('max_tokens', 100),
+                    "temperature": kwargs.get('temperature', 0.7),
+                    "top_p": kwargs.get('top_p', 0.9),
+                    "do_sample": True,
+                    "return_full_text": False
+                },
+                "options": {"wait_for_model": True}
+            }
+
+            response = await asyncio.to_thread(
+                requests.post,
+                f"{self.base_url}/{model}",
+                headers=headers,
+                json=data,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            # Handle different response formats
+            if isinstance(result, list) and result:
+                if "generated_text" in result[0]:
+                    return result[0]["generated_text"]
+                elif "conversation" in result[0]:
+                    return result[0]["conversation"]["generated_responses"][-1]
+
+            return str(result)
+        except requests.RequestException as e:
+            logger.error(f"Hugging Face generate error: {e}")
+            return "❌ Error communicating with Hugging Face."
+
+    async def list_models(self) -> list[str]:
+        """List available Hugging Face models (simplified)"""
+        # Hugging Face has too many models, return popular ones
+        return [
+            "microsoft/DialoGPT-medium",
+            "facebook/blenderbot-400M-distill",
+            "google/flan-t5-base",
+            "microsoft/DialoGPT-large"
+        ]
+
+
+class AnthropicProvider(LLMProvider):
+    """Anthropic Claude provider"""
+
+    def __init__(self, api_key: str, timeout: int = 30):
+        super().__init__(timeout)
+        self.api_key = api_key
+        self.base_url = "https://api.anthropic.com/v1"
+
+    async def generate(self, prompt: str, model: str = "claude-3-haiku-20240307", **kwargs) -> str:
+        """Generate response with Anthropic Claude"""
+        try:
+            headers = {
+                "x-api-key": self.api_key,
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01"
+            }
+            data = {
+                "model": model,
+                "max_tokens": kwargs.get('max_tokens', 1000),
+                "messages": [{"role": "user", "content": prompt}]
+            }
+
+            response = await asyncio.to_thread(
+                requests.post,
+                f"{self.base_url}/messages",
+                headers=headers,
+                json=data,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["content"][0]["text"]
+        except requests.RequestException as e:
+            logger.error(f"Anthropic generate error: {e}")
+            return "❌ Error communicating with Anthropic."
+
+    async def list_models(self) -> list[str]:
+        """List available Anthropic models"""
+        # Anthropic doesn't have a public models endpoint, return known models
+        return [
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307",
+            "claude-2.1",
+            "claude-instant-1.2"
+        ]
+
+
 class LLMClient:
     """Multi-provider LLM client"""
 
@@ -227,6 +390,21 @@ class LLMClient:
             if not api_key:
                 raise ValueError("Groq API key required")
             return GroqProvider(api_key, kwargs.get('timeout', 30))
+        elif provider == "together":
+            api_key = kwargs.get('api_key')
+            if not api_key:
+                raise ValueError("Together AI API key required")
+            return TogetherProvider(api_key, kwargs.get('timeout', 30))
+        elif provider == "huggingface":
+            api_key = kwargs.get('api_key')
+            if not api_key:
+                raise ValueError("Hugging Face API key required")
+            return HuggingFaceProvider(api_key, kwargs.get('timeout', 30))
+        elif provider == "anthropic":
+            api_key = kwargs.get('api_key')
+            if not api_key:
+                raise ValueError("Anthropic API key required")
+            return AnthropicProvider(api_key, kwargs.get('timeout', 30))
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
