@@ -267,15 +267,7 @@ class TelegramOllamaBot:
                 if handler_method:
                     app.add_handler(CommandHandler(command, handler_method))
 
-        # Legacy command handlers (for backward compatibility)
-        app.add_handler(CommandHandler("start", self.handlers.start))
-        app.add_handler(CommandHandler("help", self.handlers.help_command))
-        app.add_handler(CommandHandler("menu", self.handlers.show_menu))
-        app.add_handler(CommandHandler("model", self.handlers.model_info))
-        app.add_handler(CommandHandler("listmodels", self.handlers.list_models_cmd))
-        app.add_handler(CommandHandler("changemodel", self.handlers.change_model))
-        app.add_handler(CommandHandler("setprompt", self.handlers.set_prompt))
-        app.add_handler(CommandHandler("timeout", self.handlers.set_timeout))
+        # Legacy command handlers removed - using plugin system exclusively
 
         # Callback query handlers from plugins
         telegram_plugin = plugin_manager.plugins.get("telegram")
@@ -285,11 +277,7 @@ class TelegramOllamaBot:
             )
             app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
 
-        # Legacy callback handlers
-        app.add_handler(
-            CallbackQueryHandler(self.handlers.model_callback, pattern=r"^changemodel:")
-        )
-        app.add_handler(CallbackQueryHandler(self.handlers.menu_callback))
+        # Legacy callback handlers removed - using plugin system
 
         # Message handler for general messages
         app.add_handler(
