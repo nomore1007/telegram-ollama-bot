@@ -265,7 +265,16 @@ class TelegramOllamaBot:
             for command in plugin.get_commands():
                 handler_method = getattr(plugin, f"handle_{command}", None)
                 if handler_method:
-                    app.add_handler(CommandHandler(command, handler_method))
+                    # Create a closure to ensure correct plugin instance binding
+                    async def plugin_handler(update, context, plugin=plugin, method=handler_method):
+                        try:
+                            return await method(update, context)
+                        except AttributeError as e:
+                            logger.error(f"Plugin handler error for {command}: {e}")
+                            if update.message:
+                                await update.message.reply_text(f"❌ Error processing command /{command}")
+                            return
+                    app.add_handler(CommandHandler(command, plugin_handler))
 
         # Legacy command handlers removed - using plugin system exclusively
 
