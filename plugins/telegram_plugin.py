@@ -57,7 +57,7 @@ class TelegramPlugin(Plugin):
     def initialize(self, bot_instance) -> None:
         """Initialize the plugin with the bot instance."""
         super().initialize(bot_instance)
-        self.bot_instance = bot_instance
+        self.bot_instance_instance = bot_instance
         logger.info("Telegram plugin initialized")
 
     def get_commands(self) -> List[str]:
@@ -132,7 +132,7 @@ class TelegramPlugin(Plugin):
 
     async def handle_start(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
-        assert self.bot_instance is not None, "Plugin not initialized"
+        assert self.bot_instance_instance is not None, "Plugin not initialized"
         if update.message:
             await update.message.reply_text(
                 "🌟 *Welcome to Deepthought Bot!* 🤖\n\n"
@@ -152,9 +152,9 @@ class TelegramPlugin(Plugin):
                 "`/help` - Complete command guide\n"
                 "`/menu` - Interactive feature menu\n"
                 "`/userid` - Get your user ID for admin setup\n\n"
-                f"🧠 Current: {self.bot_instance.llm.provider_name} | {self.bot_instance.llm.model}\n"
-                f"🎭 Personality: {self.bot_instance.personality.value}\n"
-                f"⏱️ Timeout: {self.bot_instance.llm.provider.timeout}s",
+                f"🧠 Current: {self.bot_instance_instance.llm.provider_name} | {self.bot_instance_instance.llm.model}\n"
+                f"🎭 Personality: {self.bot_instance_instance.personality.value}\n"
+                f"⏱️ Timeout: {self.bot_instance_instance.llm.provider.timeout}s",
                 parse_mode="Markdown"
             )
 
@@ -203,15 +203,15 @@ class TelegramPlugin(Plugin):
         """Handle /model command"""
         if update.message:
             await update.message.reply_text(
-                f"🧠 Model: `{self.bot_instance.config.OLLAMA_MODEL}`\n"
-                f"🌐 Host: `{self.bot_instance.config.OLLAMA_HOST}`\n"
-                f"⏱ Timeout: `{self.bot_instance.config.TIMEOUT}s`",
+                f"🧠 Model: `{self.bot_instance_instance.config.OLLAMA_MODEL}`\n"
+                f"🌐 Host: `{self.bot_instance_instance.config.OLLAMA_HOST}`\n"
+                f"⏱ Timeout: `{self.bot_instance_instance.config.TIMEOUT}s`",
                 parse_mode="Markdown",
             )
 
     async def handle_listmodels(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listmodels command"""
-        models = await self.bot.llm.list_models()
+        models = await self.bot_instance.llm.list_models()
         if not models:
             if update.message:
                 await update.message.reply_text("❌ No models found.")
@@ -226,7 +226,7 @@ class TelegramPlugin(Plugin):
         """Handle /changemodel command"""
         if not context.args or len(context.args) == 0:
             # Show available models if no argument provided
-            models = await self.bot.llm.list_models()
+            models = await self.bot_instance.llm.list_models()
             if not models:
                 if update.message:
                     await update.message.reply_text("❌ No models available.")
@@ -237,7 +237,7 @@ class TelegramPlugin(Plugin):
                 await update.message.reply_text(
                     f"🤖 Available models:\n{model_list}\n\n"
                     f"💡 Usage: `/changemodel <model_name>`\n"
-                    f"📍 Current: `{self.bot_instance.config.OLLAMA_MODEL}`",
+                    f"📍 Current: `{self.bot_instance_instance.config.OLLAMA_MODEL}`",
                     parse_mode="Markdown"
                 )
             return
@@ -246,7 +246,7 @@ class TelegramPlugin(Plugin):
         requested_model = " ".join(context.args)
 
         # Validate the model exists
-        models = await self.bot.llm.list_models()
+        models = await self.bot_instance.llm.list_models()
         if requested_model not in models:
             if update.message:
                 await update.message.reply_text(
@@ -258,8 +258,8 @@ class TelegramPlugin(Plugin):
             return
 
         # Update the model
-        self.bot_instance.config.OLLAMA_MODEL = requested_model
-        self.bot.llm.set_model(requested_model)
+        self.bot_instance_instance.config.OLLAMA_MODEL = requested_model
+        self.bot_instance.llm.set_model(requested_model)
 
         if update.message:
             await update.message.reply_text(
@@ -279,8 +279,8 @@ class TelegramPlugin(Plugin):
             if not 1 <= seconds <= 600:
                 raise ValueError("Timeout out of range")
 
-            self.bot_instance.config.TIMEOUT = seconds
-            self.bot.llm.set_timeout(seconds)
+            self.bot_instance_instance.config.TIMEOUT = seconds
+            self.bot_instance.llm.set_timeout(seconds)
 
             if update.message:
                 await update.message.reply_text(f"✅ Timeout set to {seconds}s")
@@ -297,7 +297,7 @@ class TelegramPlugin(Plugin):
         try:
             if not context.args or len(context.args) == 0:
                 # Show current prompt
-                current_prompt = self.bot_instance.custom_prompt[:100] + "..." if len(self.bot_instance.custom_prompt) > 100 else self.bot_instance.custom_prompt
+                current_prompt = self.bot_instance_instance.custom_prompt[:100] + "..." if len(self.bot_instance_instance.custom_prompt) > 100 else self.bot_instance_instance.custom_prompt
                 if update.message:
                     await update.message.reply_text(
                         f"📝 *Current Prompt:*\n\n`{current_prompt}`\n\n"
@@ -315,7 +315,7 @@ class TelegramPlugin(Plugin):
             if len(new_prompt) > 1000:
                 raise ValueError("Prompt too long (max 1000 characters)")
 
-            self.bot_instance.custom_prompt = new_prompt
+            self.bot_instance_instance.custom_prompt = new_prompt
 
             if update.message:
                 preview = new_prompt[:100] + "..." if len(new_prompt) > 100 else new_prompt
@@ -354,7 +354,7 @@ class TelegramPlugin(Plugin):
             await query.edit_message_text(
                 "💬 *Chat Mode*\n\n"
                 "Just send me any message and I'll respond using the AI model.\n\n"
-                f"🧠 Current model: `{self.bot_instance.config.OLLAMA_MODEL}`",
+                f"🧠 Current model: `{self.bot_instance_instance.config.OLLAMA_MODEL}`",
                 parse_mode="Markdown",
                 reply_markup=back_button
             )
@@ -405,7 +405,7 @@ class TelegramPlugin(Plugin):
                 "⏱️ *Set Timeout*\n\n"
                 "Use the command:\n`/timeout <seconds>`\n\n"
                 "Valid range: 1-600 seconds\n"
-                f"Current timeout: `{self.bot_instance.config.TIMEOUT}s`",
+                f"Current timeout: `{self.bot_instance_instance.config.TIMEOUT}s`",
                 parse_mode="Markdown",
                 reply_markup=back_button
             )
@@ -452,8 +452,8 @@ class TelegramPlugin(Plugin):
             model_name = model_list[model_idx]
             logger.info(f"Selected model: {model_name}")
 
-            self.bot_instance.config.OLLAMA_MODEL = model_name
-            self.bot_instance.ollama.model = model_name
+            self.bot_instance_instance.config.OLLAMA_MODEL = model_name
+            self.bot_instance_instance.ollama.model = model_name
 
             await query.edit_message_text(
                 f"✅ Model updated to:\n`{model_name}`",
@@ -487,9 +487,9 @@ class TelegramPlugin(Plugin):
         """Show model info in query context"""
         text = (
             f"🧠 *Model Information*\n\n"
-            f"🤖 Model: `{self.bot_instance.config.OLLAMA_MODEL}`\n"
-            f"🌐 Host: `{self.bot_instance.config.OLLAMA_HOST}`\n"
-            f"⏱ Timeout: `{self.bot_instance.config.TIMEOUT}s`"
+            f"🤖 Model: `{self.bot_instance_instance.config.OLLAMA_MODEL}`\n"
+            f"🌐 Host: `{self.bot_instance_instance.config.OLLAMA_HOST}`\n"
+            f"⏱ Timeout: `{self.bot_instance_instance.config.TIMEOUT}s`"
         )
         back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
         if query:
@@ -497,7 +497,7 @@ class TelegramPlugin(Plugin):
 
     async def _show_models_list(self, query):
         """Show models list in query context"""
-        models = await self.bot.llm.list_models()
+        models = await self.bot_instance.llm.list_models()
         back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
         if not models:
             if query:
@@ -510,7 +510,7 @@ class TelegramPlugin(Plugin):
 
     async def _show_model_selection(self, query, context):
         """Show model selection in query context"""
-        models = await self.bot.llm.list_models()
+        models = await self.bot_instance.llm.list_models()
         if not models:
             back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
             if query:
@@ -533,7 +533,7 @@ class TelegramPlugin(Plugin):
 
         if query:
             await query.edit_message_text(
-                f"🤖 *Select a Model*\n\n(Current: `{self.bot_instance.config.OLLAMA_MODEL}`)",
+                f"🤖 *Select a Model*\n\n(Current: `{self.bot_instance_instance.config.OLLAMA_MODEL}`)",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
@@ -596,7 +596,7 @@ class TelegramPlugin(Plugin):
             new_admin_id = int(context.args[0])
             requesting_user_id = update.effective_user.id
 
-            if self.bot.admin_manager.add_admin(new_admin_id, requesting_user_id):
+            if self.bot_instance.admin_manager.add_admin(new_admin_id, requesting_user_id):
                 if update.message:
                     await update.message.reply_text(f"✅ Added user {new_admin_id} as administrator.")
             else:
@@ -623,7 +623,7 @@ class TelegramPlugin(Plugin):
             admin_id = int(context.args[0])
             requesting_user_id = update.effective_user.id
 
-            if self.bot.admin_manager.remove_admin(admin_id, requesting_user_id):
+            if self.bot_instance.admin_manager.remove_admin(admin_id, requesting_user_id):
                 if update.message:
                     await update.message.reply_text(f"✅ Removed user {admin_id} from administrators.")
             else:
@@ -637,7 +637,7 @@ class TelegramPlugin(Plugin):
     @require_admin
     async def handle_listadmins(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listadmins command"""
-        admins = self.bot.admin_manager.get_admins()
+        admins = self.bot_instance.admin_manager.get_admins()
         if not admins:
             admin_list = "No administrators configured."
         else:
@@ -658,7 +658,7 @@ class TelegramPlugin(Plugin):
             for key, info in personalities.items()
         )
 
-        current = self.bot_instance.personality.value if hasattr(self.bot_instance, 'personality') else 'helpful'
+        current = self.bot_instance_instance.personality.value if hasattr(self.bot_instance_instance, 'personality') else 'helpful'
 
         if update.message:
             await update.message.reply_text(
@@ -689,7 +689,7 @@ class TelegramPlugin(Plugin):
 
         try:
             new_personality = Personality(personality_name)
-            self.bot_instance.personality = new_personality
+            self.bot_instance_instance.personality = new_personality
 
             if update.message:
                 await update.message.reply_text(
@@ -706,7 +706,7 @@ class TelegramPlugin(Plugin):
         """Handle /clear command - clear conversation history"""
         chat_id = update.effective_chat.id if update.effective_chat else None
         if chat_id:
-            self.bot_instance.conversation_manager.clear_conversation(chat_id)
+            self.bot_instance_instance.conversation_manager.clear_conversation(chat_id)
             if update.message:
                 await update.message.reply_text("🧹 *Conversation history cleared!*", parse_mode="Markdown")
         else:
