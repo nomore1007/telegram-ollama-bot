@@ -46,9 +46,19 @@ class NewsSummarizer:
     async def extract_article_content(self, url: str) -> dict:
         """Extract article content using newspaper3k"""
         try:
+            # SECURITY: Add timeout protection for external requests
+            import asyncio
             article = Article(url)
-            await asyncio.to_thread(article.download)
-            await asyncio.to_thread(article.parse)
+
+            # Use asyncio.wait_for to add timeout
+            await asyncio.wait_for(
+                asyncio.to_thread(article.download),
+                timeout=30.0  # 30 second timeout
+            )
+            await asyncio.wait_for(
+                asyncio.to_thread(article.parse),
+                timeout=15.0  # 15 second timeout for parsing
+            )
 
             if not article.title or not article.text:
                 return {"success": False, "error": "Could not extract article content"}
@@ -63,8 +73,8 @@ class NewsSummarizer:
                 "summary": article.summary if hasattr(article, 'summary') else None
             }
         except Exception as e:
-            logger.error(f"Error extracting article from {url}: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Error extracting article from {url}: {type(e).__name__}")
+            return {"success": False, "error": "Failed to extract article content"}
 
     async def summarize_with_ai(self, article_data: dict) -> str:
         """Use AI to summarize the article"""
@@ -96,8 +106,8 @@ Keep it informative but concise."""
             summary = await self.ollama.generate(prompt)
             return summary
         except Exception as e:
-            logger.error(f"Error generating summary: {e}")
-            return "❌ Error generating AI summary."
+            logger.error(f"Error generating summary: {type(e).__name__}")
+            return "❌ Failed to generate article summary."
 
     async def process_article(self, url: str) -> str:
         """Process a single article and return summary"""
@@ -178,7 +188,12 @@ class YouTubeSummarizer:
         """Get video information using pytube"""
         try:
             youtube = pytube.YouTube(f"https://www.youtube.com/watch?v={video_id}")
-            await asyncio.to_thread(youtube.check_availability)
+
+            # SECURITY: Add timeout protection
+            await asyncio.wait_for(
+                asyncio.to_thread(youtube.check_availability),
+                timeout=20.0  # 20 second timeout
+            )
 
             return {
                 "success": True,
@@ -191,8 +206,8 @@ class YouTubeSummarizer:
                 "url": f"https://www.youtube.com/watch?v={video_id}"
             }
         except Exception as e:
-            logger.error(f"Error getting video info for {video_id}: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Error getting video info for {video_id}: {type(e).__name__}")
+            return {"success": False, "error": "Failed to retrieve video information"}
 
     async def get_transcript(self, video_id: str) -> dict:
         """Get transcript for YouTube video"""
@@ -240,10 +255,10 @@ class YouTubeSummarizer:
             }
 
         except (TranscriptsDisabled, NoTranscriptFound) as e:
-            return {"success": False, "error": f"Transcript unavailable: {str(e)}"}
+            return {"success": False, "error": "Transcript not available for this video"}
         except Exception as e:
-            logger.error(f"Error getting transcript for {video_id}: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Error getting transcript for {video_id}: {type(e).__name__}")
+            return {"success": False, "error": "Failed to retrieve video transcript"}
 
     async def summarize_transcript(self, video_info: dict, transcript_data: dict) -> str:
         """Use AI to summarize video transcript"""
@@ -279,8 +294,8 @@ Keep it informative and well-structured."""
             summary = await self.ollama.generate(prompt)
             return summary
         except Exception as e:
-            logger.error(f"Error generating transcript summary: {e}")
-            return "❌ Error generating AI summary."
+            logger.error(f"Error generating transcript summary: {type(e).__name__}")
+            return "❌ Failed to generate video summary."
 
     async def process_video(self, url: str) -> str:
         """Process a single YouTube video and return summary"""

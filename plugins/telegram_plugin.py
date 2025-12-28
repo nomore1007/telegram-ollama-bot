@@ -1,8 +1,12 @@
-"""Telegram bot handlers for commands and callbacks"""
+"""
+Telegram plugin for the bot.
+
+This plugin handles all Telegram-specific functionality including commands, menus, and callbacks.
+"""
 
 import logging
 import hashlib
-from typing import Optional
+from typing import Optional, List
 
 from telegram import (
     Update,
@@ -10,14 +14,9 @@ from telegram import (
     InlineKeyboardMarkup,
     BotCommand,
 )
-from telegram.ext import (
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    CallbackContext,
-    filters,
-)
+from telegram.ext import ContextTypes
 
+from .base import Plugin
 from constants import MAX_MESSAGE_LENGTH
 
 
@@ -25,21 +24,54 @@ def anonymize_user_id(user_id: int) -> str:
     """Anonymize user ID for logging purposes"""
     return hashlib.sha256(str(user_id).encode()).hexdigest()[:8]
 
+
 logger = logging.getLogger(__name__)
 
 
-class TelegramHandlers:
-    """Handles Telegram bot commands and messages"""
+class TelegramPlugin(Plugin):
+    """Plugin that handles Telegram bot commands and interactions."""
 
-    def __init__(self, bot_instance):
-        self.bot = bot_instance
+    def __init__(self, name: str, config: Optional[dict] = None):
+        super().__init__(name, config)
+        self.bot_instance_instance = None
 
-    # ---------------------------------------------------------------
-    # Command handlers
-    # ---------------------------------------------------------------
+    def initialize(self, bot_instance) -> None:
+        """Initialize the plugin with the bot instance."""
+        self.bot_instance_instance = bot_instance
+        logger.info("Telegram plugin initialized")
 
-    async def start(self, update, context: CallbackContext):
+    def get_commands(self) -> List[str]:
+        """Return list of commands this plugin handles."""
+        return [
+            "start", "help", "menu", "model", "listmodels", "changemodel",
+            "setprompt", "timeout"
+        ]
+
+    def get_help_text(self) -> str:
+        """Return help text for this plugin."""
+        return (
+            "🤖 *Telegram Bot Commands*\n\n"
+            "`/start` - Show welcome message and commands\n"
+            "`/help` - Show this help message\n"
+            "`/menu` - Show the main menu\n"
+            "`/model` - Show current AI model info\n"
+            "`/listmodels` - List all available AI models\n"
+            "`/changemodel <model>` - Change AI model\n"
+            "`/setprompt` - Set custom AI prompt\n"
+            "`/timeout` - Set request timeout"
+        )
+
+    def on_command(self, update, context: ContextTypes.DEFAULT_TYPE, command: str, bot_instance) -> Optional[str]:
+        """Handle commands specific to this plugin."""
+        # This will be called from the main bot, but since Telegram handlers need direct async responses,
+        # we'll handle this differently. For now, return None and let main bot handle.
+        return None
+
+    # Direct handler methods that can be called by the main bot
+
+    async def handle_start(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
+        assert self.bot_instance is not None, "Plugin not initialized"
         if update.message:
             await update.message.reply_text(
                 "🤖 *Telegram Ollama Bot*\n\n"
@@ -55,12 +87,12 @@ class TelegramHandlers:
                 "📰 *News Detection:* Send any message with a news link!\n"
                 "🎬 *YouTube Detection:* Send any message with a YouTube link!\n\n"
                 "💬 *Chat:* Just send any message to talk with AI!\n\n"
-                f"🧠 Current model: `{self.bot.config.OLLAMA_MODEL}`\n"
-                f"⏱️ Timeout: `{self.bot.config.TIMEOUT}s`",
+                f"🧠 Current model: `{self.bot_instance.config.OLLAMA_MODEL}`\n"
+                f"⏱️ Timeout: `{self.bot_instance.config.TIMEOUT}s`",
                 parse_mode="Markdown"
             )
 
-    async def help_command(self, update, context: CallbackContext):
+    async def handle_help(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
         if update.message:
             await update.message.reply_text(
@@ -85,7 +117,7 @@ class TelegramHandlers:
                 parse_mode="Markdown"
             )
 
-    async def show_menu(self, update, context: CallbackContext):
+    async def handle_menu(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /menu command"""
         if update.message:
             keyboard = [
@@ -101,19 +133,19 @@ class TelegramHandlers:
                 parse_mode="Markdown"
             )
 
-    async def model_info(self, update, context: CallbackContext):
+    async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
         if update.message:
             await update.message.reply_text(
-                f"🧠 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
-                f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
-                f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`",
+                f"🧠 Model: `{self.bot_instance.config.OLLAMA_MODEL}`\n"
+                f"🌐 Host: `{self.bot_instance.config.OLLAMA_HOST}`\n"
+                f"⏱ Timeout: `{self.bot_instance.config.TIMEOUT}s`",
                 parse_mode="Markdown",
             )
 
-    async def list_models_cmd(self, update, context: CallbackContext):
+    async def handle_listmodels(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listmodels command"""
-        models = await self.bot.ollama.list_models()
+        models = await self.bot.llm.list_models()
         if not models:
             if update.message:
                 await update.message.reply_text("❌ No models found.")
@@ -123,11 +155,11 @@ class TelegramHandlers:
         if update.message:
             await update.message.reply_text(f"🤖 Available models:\n{text}")
 
-    async def change_model(self, update, context: CallbackContext):
+    async def handle_changemodel(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /changemodel command"""
         if not context.args or len(context.args) == 0:
             # Show available models if no argument provided
-            models = await self.bot.ollama.list_models()
+            models = await self.bot.llm.list_models()
             if not models:
                 if update.message:
                     await update.message.reply_text("❌ No models available.")
@@ -138,7 +170,7 @@ class TelegramHandlers:
                 await update.message.reply_text(
                     f"🤖 Available models:\n{model_list}\n\n"
                     f"💡 Usage: `/changemodel <model_name>`\n"
-                    f"📍 Current: `{self.bot.config.OLLAMA_MODEL}`",
+                    f"📍 Current: `{self.bot_instance.config.OLLAMA_MODEL}`",
                     parse_mode="Markdown"
                 )
             return
@@ -147,7 +179,7 @@ class TelegramHandlers:
         requested_model = " ".join(context.args)
 
         # Validate the model exists
-        models = await self.bot.ollama.list_models()
+        models = await self.bot.llm.list_models()
         if requested_model not in models:
             if update.message:
                 await update.message.reply_text(
@@ -159,8 +191,8 @@ class TelegramHandlers:
             return
 
         # Update the model
-        self.bot.config.OLLAMA_MODEL = requested_model
-        self.bot.ollama.model = requested_model
+        self.bot_instance.config.OLLAMA_MODEL = requested_model
+        self.bot.llm.set_model(requested_model)
 
         if update.message:
             await update.message.reply_text(
@@ -169,7 +201,7 @@ class TelegramHandlers:
                 parse_mode="Markdown"
             )
 
-    async def set_timeout(self, update, context: CallbackContext):
+    async def handle_timeout(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /timeout command"""
         try:
             if not context.args or len(context.args) == 0:
@@ -179,8 +211,8 @@ class TelegramHandlers:
             if not 1 <= seconds <= 600:
                 raise ValueError("Timeout out of range")
 
-            self.bot.config.TIMEOUT = seconds
-            self.bot.ollama.timeout = seconds
+            self.bot_instance.config.TIMEOUT = seconds
+            self.bot.llm.set_timeout(seconds)
 
             if update.message:
                 await update.message.reply_text(f"✅ Timeout set to {seconds}s")
@@ -191,12 +223,12 @@ class TelegramHandlers:
                     "❌ Usage: /timeout <seconds> (1–600)"
                 )
 
-    async def set_prompt(self, update, context: CallbackContext):
+    async def handle_setprompt(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /setprompt command"""
         try:
             if not context.args or len(context.args) == 0:
                 # Show current prompt
-                current_prompt = self.bot.custom_prompt[:100] + "..." if len(self.bot.custom_prompt) > 100 else self.bot.custom_prompt
+                current_prompt = self.bot_instance.custom_prompt[:100] + "..." if len(self.bot_instance.custom_prompt) > 100 else self.bot_instance.custom_prompt
                 if update.message:
                     await update.message.reply_text(
                         f"📝 *Current Prompt:*\n\n`{current_prompt}`\n\n"
@@ -214,7 +246,7 @@ class TelegramHandlers:
             if len(new_prompt) > 1000:
                 raise ValueError("Prompt too long (max 1000 characters)")
 
-            self.bot.custom_prompt = new_prompt
+            self.bot_instance.custom_prompt = new_prompt
 
             if update.message:
                 preview = new_prompt[:100] + "..." if len(new_prompt) > 100 else new_prompt
@@ -233,11 +265,7 @@ class TelegramHandlers:
                     parse_mode="Markdown"
                 )
 
-    # ---------------------------------------------------------------
-    # Callback handlers
-    # ---------------------------------------------------------------
-
-    async def menu_callback(self, update, context: CallbackContext):
+    async def handle_menu_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle menu callbacks"""
         query = update.callback_query
         if not query:
@@ -257,7 +285,7 @@ class TelegramHandlers:
             await query.edit_message_text(
                 "💬 *Chat Mode*\n\n"
                 "Just send me any message and I'll respond using the AI model.\n\n"
-                f"🧠 Current model: `{self.bot.config.OLLAMA_MODEL}`",
+                f"🧠 Current model: `{self.bot_instance.config.OLLAMA_MODEL}`",
                 parse_mode="Markdown",
                 reply_markup=back_button
             )
@@ -308,7 +336,7 @@ class TelegramHandlers:
                 "⏱️ *Set Timeout*\n\n"
                 "Use the command:\n`/timeout <seconds>`\n\n"
                 "Valid range: 1-600 seconds\n"
-                f"Current timeout: `{self.bot.config.TIMEOUT}s`",
+                f"Current timeout: `{self.bot_instance.config.TIMEOUT}s`",
                 parse_mode="Markdown",
                 reply_markup=back_button
             )
@@ -319,7 +347,7 @@ class TelegramHandlers:
         else:
             await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
 
-    async def model_callback(self, update, context: CallbackContext):
+    async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle model selection callbacks"""
         query = update.callback_query
         if not query:
@@ -354,8 +382,8 @@ class TelegramHandlers:
             model_name = model_list[model_idx]
             logger.info(f"Selected model: {model_name}")
 
-            self.bot.config.OLLAMA_MODEL = model_name
-            self.bot.ollama.model = model_name
+            self.bot_instance.config.OLLAMA_MODEL = model_name
+            self.bot_instance.ollama.model = model_name
 
             await query.edit_message_text(
                 f"✅ Model updated to:\n`{model_name}`",
@@ -368,9 +396,7 @@ class TelegramHandlers:
             if query:
                 await query.edit_message_text("❌ Failed to update model.")
 
-    # ---------------------------------------------------------------
-    # Helper methods
-    # ---------------------------------------------------------------
+    # Helper methods (similar to original handlers.py)
 
     async def show_menu_query(self, query):
         """Show menu in query context"""
@@ -391,9 +417,9 @@ class TelegramHandlers:
         """Show model info in query context"""
         text = (
             f"🧠 *Model Information*\n\n"
-            f"🤖 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
-            f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
-            f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
+            f"🤖 Model: `{self.bot_instance.config.OLLAMA_MODEL}`\n"
+            f"🌐 Host: `{self.bot_instance.config.OLLAMA_HOST}`\n"
+            f"⏱ Timeout: `{self.bot_instance.config.TIMEOUT}s`"
         )
         back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
         if query:
@@ -401,7 +427,7 @@ class TelegramHandlers:
 
     async def _show_models_list(self, query):
         """Show models list in query context"""
-        models = await self.bot.ollama.list_models()
+        models = await self.bot.llm.list_models()
         back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
         if not models:
             if query:
@@ -414,7 +440,7 @@ class TelegramHandlers:
 
     async def _show_model_selection(self, query, context):
         """Show model selection in query context"""
-        models = await self.bot.ollama.list_models()
+        models = await self.bot.llm.list_models()
         if not models:
             back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
             if query:
@@ -437,7 +463,7 @@ class TelegramHandlers:
 
         if query:
             await query.edit_message_text(
-                f"🤖 *Select a Model*\n\n(Current: `{self.bot.config.OLLAMA_MODEL}`)",
+                f"🤖 *Select a Model*\n\n(Current: `{self.bot_instance.config.OLLAMA_MODEL}`)",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )

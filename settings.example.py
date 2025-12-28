@@ -20,6 +20,17 @@ DEFAULT_PROMPT: str = os.getenv(
     """You are a helpful AI assistant. Respond to the user's message like a dude bro, but informative and concise. Be helpful and accurate in your responses."""
 )
 
+# Plugin configuration
+ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "telegram,web_search,discord").split(",")
+
+# Discord configuration
+DISCORD_BOT_TOKEN: Optional[str] = os.getenv("DISCORD_BOT_TOKEN")
+
+# LLM Provider configuration
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")  # ollama, openai, groq
+OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
+
 # Validate required settings
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")

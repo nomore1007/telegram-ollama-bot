@@ -122,7 +122,7 @@ class RateLimiter:
         # Check burst limit
         if len(requests) >= self.burst_limit:
             self.blocked_users.add(user_id)
-            logger.warning(f"User {user_id} blocked due to burst limit violation")
+            logger.warning(f"User blocked due to burst limit violation")
             return False, "Too many requests. Please slow down."
 
         # Check rate limit
@@ -136,7 +136,7 @@ class RateLimiter:
     def unblock_user(self, user_id: int) -> None:
         """Unblock a user"""
         self.blocked_users.discard(user_id)
-        logger.info(f"User {user_id} unblocked")
+        logger.info(f"User unblocked")
 
     def cleanup(self) -> None:
         """Clean up old request data"""

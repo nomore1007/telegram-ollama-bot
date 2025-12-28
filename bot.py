@@ -50,11 +50,15 @@ from constants import (
     MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
     LOG_FORMAT, LOG_LEVEL
 )
-from ollama_client import OllamaClient
+from llm_client import LLMClient, OllamaProvider
 from summarizers import NewsSummarizer, YouTubeSummarizer
 from handlers import TelegramHandlers
 from conversation import ConversationManager
 from security import InputValidator, RateLimiter
+from plugins import plugin_manager
+from plugins.telegram_plugin import TelegramPlugin
+from plugins.web_search_plugin import WebSearchPlugin
+from plugins.discord_plugin import DiscordPlugin
 
 
 # -------------------------------------------------------------------
@@ -77,19 +81,55 @@ class TelegramOllamaBot:
 
     def __init__(self, config):
         self.config = config
-        self.ollama = OllamaClient(
-            config.OLLAMA_HOST,
-            config.OLLAMA_MODEL,
-            config.TIMEOUT,
-        )
-        self.news_summarizer = NewsSummarizer(self.ollama)
-        self.youtube_summarizer = YouTubeSummarizer(self.ollama)
+        # Initialize LLM client based on provider
+        llm_provider = getattr(config, 'LLM_PROVIDER', 'ollama')
+        llm_kwargs = {
+            'model': getattr(config, 'OLLAMA_MODEL', 'llama2'),
+            'timeout': getattr(config, 'TIMEOUT', 30)
+        }
+
+        if llm_provider == 'ollama':
+            llm_kwargs['host'] = getattr(config, 'OLLAMA_HOST', 'http://localhost:11434')
+        elif llm_provider in ['openai', 'groq']:
+            api_key = getattr(config, f'{llm_provider.upper()}_API_KEY', None)
+            if api_key:
+                llm_kwargs['api_key'] = api_key
+            else:
+                logger.warning(f"No API key for {llm_provider}, falling back to ollama")
+                llm_provider = 'ollama'
+                llm_kwargs['host'] = getattr(config, 'OLLAMA_HOST', 'http://localhost:11434')
+
+        self.llm = LLMClient(provider=llm_provider, **llm_kwargs)
+        self.news_summarizer = NewsSummarizer(self.llm)
+        self.youtube_summarizer = YouTubeSummarizer(self.llm)
         self.conversation_manager = ConversationManager()
         self.input_validator = InputValidator()
         self.rate_limiter = RateLimiter()
         self.custom_prompt = getattr(config, 'DEFAULT_PROMPT', "You are a helpful AI assistant.")
         self.bot_username = None
+
+        # Initialize plugins
+        self._load_plugins()
+
+        # Legacy handlers for backward compatibility
         self.handlers = TelegramHandlers(self)
+
+    def _load_plugins(self):
+        """Load and initialize plugins."""
+        enabled_plugins = getattr(self.config, 'ENABLED_PLUGINS', ['telegram', 'web_search'])
+
+        # Load available plugins
+        plugin_manager.load_plugin("telegram", TelegramPlugin, {})
+        plugin_manager.load_plugin("web_search", WebSearchPlugin, {})
+        plugin_manager.load_plugin("discord", DiscordPlugin, {})
+
+        # Enable configured plugins
+        for plugin_name in enabled_plugins:
+            if plugin_name.strip() in plugin_manager.plugins:
+                plugin_manager.enable_plugin(plugin_name.strip())
+
+        # Initialize all enabled plugins
+        plugin_manager.initialize_plugins(self)
 
     # ---------------------------------------------------------------
     # Message handling
@@ -100,6 +140,12 @@ class TelegramOllamaBot:
         if update.message:
             message_text = update.message.text
             if not message_text:
+                return
+
+            # SECURITY: Add message size limits
+            MAX_MESSAGE_SIZE = 4096  # characters
+            if len(message_text) > MAX_MESSAGE_SIZE:
+                await update.message.reply_text("🚫 Message too long. Please keep messages under 4000 characters.")
                 return
 
             chat_id = update.message.chat.id
@@ -155,8 +201,8 @@ class TelegramOllamaBot:
                             await update.message.reply_text(summary, parse_mode="Markdown")
 
                     except Exception as e:
-                        logger.error(f"Error processing video {url}: {e}")
-                        await update.message.reply_text(f"❌ Failed to process video from {url}. Please try again later.")
+                        logger.error(f"Error processing video {url}: {type(e).__name__}")
+                        await update.message.reply_text(f"❌ Failed to process video. Please try again later.")
 
                 return
 
@@ -180,8 +226,8 @@ class TelegramOllamaBot:
                             await update.message.reply_text(summary, parse_mode="Markdown")
 
                     except Exception as e:
-                        logger.error(f"Error processing article {url}: {e}")
-                        await update.message.reply_text(f"❌ Failed to process article from {url}. Please try again later.")
+                        logger.error(f"Error processing article {url}: {type(e).__name__}")
+                        await update.message.reply_text(f"❌ Failed to process article. Please try again later.")
 
                 return
 
@@ -196,7 +242,7 @@ class TelegramOllamaBot:
             context = self.conversation_manager.get_context(chat_id, self.custom_prompt)
 
             # Generate response with full context
-            response = await self.ollama.generate(context)
+            response = await self.llm.generate(context)
 
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)
@@ -231,7 +277,14 @@ class TelegramOllamaBot:
         app_builder.post_init(self.post_init)
         app = app_builder.build()
 
-        # Command handlers
+        # Command handlers from plugins
+        for plugin in plugin_manager.get_enabled_plugins():
+            for command in plugin.get_commands():
+                handler_method = getattr(plugin, f"handle_{command}", None)
+                if handler_method:
+                    app.add_handler(CommandHandler(command, handler_method))
+
+        # Legacy command handlers (for backward compatibility)
         app.add_handler(CommandHandler("start", self.handlers.start))
         app.add_handler(CommandHandler("help", self.handlers.help_command))
         app.add_handler(CommandHandler("menu", self.handlers.show_menu))
@@ -241,7 +294,15 @@ class TelegramOllamaBot:
         app.add_handler(CommandHandler("setprompt", self.handlers.set_prompt))
         app.add_handler(CommandHandler("timeout", self.handlers.set_timeout))
 
-        # Callback query handlers
+        # Callback query handlers from plugins
+        telegram_plugin = plugin_manager.plugins.get("telegram")
+        if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
+            app.add_handler(
+                CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
+            )
+            app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
+
+        # Legacy callback handlers
         app.add_handler(
             CallbackQueryHandler(self.handlers.model_callback, pattern=r"^changemodel:")
         )
@@ -256,6 +317,23 @@ class TelegramOllamaBot:
         logger.info("Starting Telegram Ollama bot")
         app.run_polling()
 
+    def run_discord_bot(self):
+        """Run Discord bot if enabled."""
+        discord_plugin = plugin_manager.plugins.get("discord")
+        if discord_plugin and plugin_manager.plugins["discord"] in plugin_manager.get_enabled_plugins():
+            discord_token = getattr(self.config, 'DISCORD_BOT_TOKEN', None)
+            if discord_token:
+                logger.info("Starting Discord bot")
+                discord_plugin.run_discord_bot(discord_token)
+            else:
+                logger.warning("Discord bot token not configured")
+
+
+# -------------------------------------------------------------------
+# Backward compatibility aliases
+# -------------------------------------------------------------------
+
+OllamaClient = LLMClient  # For backward compatibility with tests
 
 # -------------------------------------------------------------------
 # Entry point
@@ -263,6 +341,14 @@ class TelegramOllamaBot:
 
 def main():
     bot = TelegramOllamaBot(settings)
+
+    # Run Discord bot in background if enabled
+    import threading
+    discord_thread = threading.Thread(target=bot.run_discord_bot)
+    discord_thread.daemon = True
+    discord_thread.start()
+
+    # Run Telegram bot
     bot.run()
 
 
