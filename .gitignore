@@ -35,6 +35,9 @@ settings.py
 
 # Test files (local development only)
 tests/
+pytest.ini
+test-*.sh
+test_*.py
 
 # Configuration files with sensitive data
 config.json
