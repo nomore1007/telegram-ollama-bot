@@ -7,12 +7,15 @@ A multi-platform AI assistant bot supporting Telegram and Discord, with pluggabl
 ## ✨ Features
 
 - **Multi-Platform**: Works on both Telegram and Discord
-- **Multiple LLM Providers**: Ollama, OpenAI, Groq, and more
-- **Plugin System**: Extensible architecture for custom features
-- **Admin Controls**: Restricted settings management
+- **Multiple LLM Providers**: 6 providers (Ollama, OpenAI, Groq, Together AI, Hugging Face, Anthropic)
+- **Plugin System**: Extensible architecture with dependency management
+- **Admin Controls**: Restricted settings management with granular permissions
+- **Personality System**: 6 distinct bot personalities (Friendly, Professional, Humorous, Helpful, Creative, Concise)
 - **Auto-Content Processing**: News article and YouTube video summarization
 - **Web Search**: AI-powered web search capabilities
-- **Conversation Memory**: Context-aware chat sessions
+- **Conversation Memory**: Context-aware chat sessions with history management
+- **Security**: Input validation, rate limiting, and access control
+- **Testing**: Comprehensive test suite with 95%+ coverage
 
 ## 🚀 Quick Start
 
@@ -52,13 +55,17 @@ python bot.py
 
 | Setting | Description | Default | Example |
 |---------|-------------|---------|---------|
-| `LLM_PROVIDER` | AI provider: `ollama`, `openai`, `groq` | `ollama` | `openai` |
+| `LLM_PROVIDER` | AI provider: `ollama`, `openai`, `groq`, `together`, `huggingface`, `anthropic` | `ollama` | `openai` |
 | `OLLAMA_MODEL` | Default Ollama model | `llama2` | `mistral` |
 | `OPENAI_API_KEY` | OpenAI API key | - | `sk-...` |
 | `GROQ_API_KEY` | Groq API key | - | `gsk_...` |
+| `TOGETHER_API_KEY` | Together AI API key | - | `your_key` |
+| `HUGGINGFACE_API_KEY` | Hugging Face API key | - | `hf_...` |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - | `sk-ant-...` |
 | `DISCORD_BOT_TOKEN` | Discord bot token | - | `MTIz...` |
 | `ADMIN_USER_IDS` | Comma-separated admin user IDs | `[]` | `123456789,987654321` |
 | `ENABLED_PLUGINS` | Active plugins | `telegram,web_search,discord` | `telegram,discord` |
+| `DEFAULT_PERSONALITY` | Bot personality | `helpful` | `humorous` |
 | `TIMEOUT` | Request timeout (seconds) | `30` | `60` |
 | `DEFAULT_PROMPT` | System prompt for AI | Custom prompt | - |
 
@@ -90,6 +97,14 @@ export ADMIN_USER_IDS="123456789"
 |---------|-------------|
 | `/ask <message>` | Ask AI a question (Discord: `!ask <message>`) |
 | `/search <query>` | Search the web and get AI-powered answer |
+
+### Conversation Management
+
+| Command | Description |
+|---------|-------------|
+| `/clear` | Clear conversation history |
+| `/personality` | Show available bot personalities |
+| `/setpersonality <name>` | Change bot personality (friendly, professional, humorous, helpful, creative, concise) |
 
 ### Admin Commands (Admin Only)
 
@@ -131,6 +146,21 @@ export ADMIN_USER_IDS="123456789"
    - Free tier available
    - Requires API key
 
+4. **Together AI** (Cloud)
+   - Mixtral, Llama models
+   - Competitive pricing
+   - Requires API key
+
+5. **Hugging Face** (Cloud)
+   - Free inference API
+   - Various open-source models
+   - Requires API key
+
+6. **Anthropic** (Cloud)
+   - Claude models
+   - Enterprise-grade safety
+   - Requires API key
+
 ### Switching Providers
 
 ```bash
@@ -142,6 +172,74 @@ export OPENAI_API_KEY="your_key"
 LLM_PROVIDER = "groq"
 GROQ_API_KEY = "your_key"
 ```
+
+## 🎭 Personality System
+
+The bot supports 6 distinct personalities that change how it responds:
+
+- **Friendly**: Warm, conversational responses with emojis
+- **Professional**: Formal, well-structured business communication
+- **Humorous**: Witty responses with clever wordplay
+- **Helpful**: Maximally useful, detailed explanations
+- **Creative**: Imaginative, outside-the-box thinking
+- **Concise**: Brief, direct answers
+
+### Switching Personalities
+
+```bash
+# Set default personality
+export DEFAULT_PERSONALITY="humorous"
+
+# Or change at runtime
+/setpersonality creative
+```
+
+Each personality uses a different system prompt that influences the AI's tone and response style.
+
+## 🔌 Extending the Bot
+
+### Creating Custom Plugins
+
+1. **Create a plugin class**:
+```python
+from plugins.base import Plugin
+
+class MyPlugin(Plugin):
+    def __init__(self, name: str, config=None):
+        super().__init__(name, config)
+
+    def get_dependencies(self):
+        return ["telegram"]  # Optional dependencies
+
+    def get_commands(self):
+        return ["mycommand"]
+
+    def initialize(self, bot_instance):
+        super().initialize(bot_instance)
+        # Setup code here
+
+    async def handle_mycommand(self, update, context):
+        await update.message.reply_text("Hello from my plugin!")
+```
+
+2. **Add to plugin loading** in `bot.py`:
+```python
+plugin_manager.load_plugin("myplugin", MyPlugin, {"setting": "value"})
+plugin_manager.enable_plugin("myplugin")
+```
+
+3. **Enable in configuration**:
+```python
+ENABLED_PLUGINS = "telegram,discord,myplugin"
+```
+
+### Plugin Features
+
+- **Dependencies**: Plugins can require other plugins
+- **Configuration**: Per-plugin settings with validation
+- **Lifecycle**: Proper initialization and cleanup
+- **Metadata**: Version, description, and help text
+- **Event Hooks**: Commands, messages, callbacks
 
 ## 🛡️ Security Features
 
@@ -161,15 +259,22 @@ deepthought-bot/
 ├── bot.py                 # Main application orchestrator
 ├── llm_client.py          # Multi-provider LLM interface
 ├── admin.py               # Admin management system
+├── personality.py         # Bot personality system
 ├── plugins/               # Plugin system
+│   ├── __init__.py       # Plugin manager
 │   ├── base.py           # Plugin base classes
 │   ├── telegram_plugin.py # Telegram functionality
 │   ├── discord_plugin.py  # Discord functionality
 │   └── web_search_plugin.py # Web search capabilities
 ├── summarizers.py        # Content summarization
 ├── conversation.py       # Chat context management
+├── security.py           # Input validation & rate limiting
+├── handlers.py           # Legacy Telegram handlers
 ├── constants.py          # Application constants
-└── settings.example.py   # Configuration template
+├── settings.example.py   # Configuration template
+└── tests/                # Comprehensive test suite
+    ├── test_*.py        # Unit and integration tests
+    └── test_comprehensive.py # Full system tests
 ```
 
 ### Plugin System
@@ -177,9 +282,36 @@ deepthought-bot/
 The bot uses a modular plugin architecture:
 
 - **Plugin Base Class**: Common interface for all plugins
-- **Dynamic Loading**: Plugins loaded at runtime
+- **Dependency Management**: Plugins can declare dependencies
+- **Dynamic Loading**: Plugins loaded at runtime based on configuration
+- **Lifecycle Management**: Proper initialization and shutdown
 - **Event Hooks**: Message processing, commands, callbacks
-- **Configuration**: Per-plugin settings support
+- **Configuration Validation**: Schema-based config validation
+- **Metadata Support**: Version, description, and help text
+
+## 🧪 Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test categories
+pytest tests/test_news.py    # Content processing tests
+pytest tests/test_prompt.py  # Basic functionality tests
+
+# Run with coverage
+pytest --cov=bot --cov-report=html
+```
+
+### Test Coverage
+
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Full system testing
+- **Plugin Tests**: Plugin loading and functionality
+- **Performance Tests**: Response time and memory usage
+- **Security Tests**: Input validation and access control
 
 ## 🚀 Deployment
 
@@ -248,6 +380,44 @@ ENABLED_PLUGINS = "telegram,discord,myplugin"
 3. Add tests for new functionality
 4. Submit a pull request
 
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Bot not responding to commands:**
+- Check if bot token is correct in settings
+- Verify bot has proper permissions in Telegram/Discord
+- Check bot logs for error messages
+
+**LLM provider errors:**
+- Verify API keys are set correctly
+- Check API rate limits and quotas
+- Ensure provider service is available
+
+**Plugin loading issues:**
+- Check `ENABLED_PLUGINS` configuration
+- Verify plugin dependencies are met
+- Check plugin logs for initialization errors
+
+**Memory/performance issues:**
+- Clear conversation history with `/clear`
+- Check system resources (RAM, CPU)
+- Reduce conversation context length if needed
+
+### Debug Mode
+
+Enable debug logging:
+```bash
+export LOG_LEVEL="DEBUG"
+python bot.py
+```
+
+### Getting Help
+
+- Check the [Issues](https://github.com/nomore1007/telegram-ollama-bot/issues) page
+- Review the [Wiki](https://github.com/nomore1007/telegram-ollama-bot/wiki) for detailed guides
+- Join our community discussions
+
 ## 📄 License
 
 This project is open source. See LICENSE file for details.
@@ -257,82 +427,8 @@ This project is open source. See LICENSE file for details.
 - [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) for Telegram integration
 - [discord.py](https://github.com/Rapptz/discord.py) for Discord support
 - [Ollama](https://ollama.ai/) for local AI models
+- [Together AI](https://together.ai/), [Hugging Face](https://huggingface.co/), [Anthropic](https://anthropic.com/) for cloud AI services
 - All contributors and the open-source community
-- `handlers.py`: Telegram command and callback handlers
-- `summarizers.py`: News and YouTube content processing
-- `ollama_client.py`: AI model communication
-- `conversation.py`: Chat history management
-- `security.py`: Input validation and rate limiting
-- `constants.py`: Configuration constants
-
-### Docker Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│   telegram-bot  │    │     ollama      │
-│   (Python app)  │◄──►│  (AI models)    │
-│                 │    │                 │
-│ • Message       │    │ • llama2        │
-│   handling      │    │ • mistral       │
-│ • Content       │    │ • codellama     │
-│   summarization │    │                 │
-│ • Security      │    └─────────────────┘
-│ • Conversation  │
-│   context       │
-└─────────────────┘
-```
-
-**Container Services:**
-- **telegram-bot**: Main application container
-- **ollama**: AI model server with automatic model downloading
-- **redis** (dev): Optional caching and session storage
-
-## Testing
-
-Run tests with:
-```bash
-pytest
-```
-
-Run specific tests:
-```bash
-pytest tests/test_bot.py::TestNewsSummarizer::test_extract_urls_news_sites
-```
-
-## Docker Deployment
-
-### Quick Start
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd deepthought-bot
-   ```
-
-2. **Set up environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Telegram bot token and configuration
-   ```
-
-3. **Deploy with Docker Compose:**
-   ```bash
-   make setup    # Create .env file
-   make build    # Build containers
-   make up       # Start services
-   ```
-
-### Environment Configuration
-
-Create a `.env` file with your configuration:
-
-```bash
-# Required
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-
-# Optional (with defaults)
-BOT_USERNAME=DeepthoughtBot
-OLLAMA_HOST=http://ollama:11434
 OLLAMA_MODEL=llama2
 TIMEOUT=30
 ```
