@@ -33,6 +33,9 @@ settings.py
 *password*
 *credential*
 
+# Test files (local development only)
+tests/
+
 # Configuration files with sensitive data
 config.json
 config.yml
