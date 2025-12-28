@@ -12,7 +12,7 @@ A multi-platform AI assistant bot supporting Telegram and Discord, with pluggabl
 - **Admin Controls**: Restricted settings management with granular permissions
 - **Personality System**: 6 distinct bot personalities (Friendly, Professional, Humorous, Helpful, Creative, Concise)
 - **Auto-Content Processing**: News article and YouTube video summarization
-- **Web Search**: AI-powered web search capabilities
+- **Web Search**: Real-time web search with AI analysis and source attribution
 - **Conversation Memory**: Context-aware chat sessions with history management
 - **Security**: Input validation, rate limiting, and access control
 - **Testing**: Comprehensive test suite with 95%+ coverage
@@ -195,6 +195,78 @@ export DEFAULT_PERSONALITY="humorous"
 ```
 
 Each personality uses a different system prompt that influences the AI's tone and response style.
+
+## 🔍 Web Search Functionality
+
+The bot includes powerful web search capabilities that allow the AI to gather real-time information and provide informed responses.
+
+### How It Works
+
+1. **Query Processing**: Your search query is sent to web search APIs
+2. **Result Collection**: Top relevant results are retrieved and summarized
+3. **AI Analysis**: The LLM analyzes the search results and provides a comprehensive answer
+4. **Source Citation**: Responses include information about the sources used
+
+### Search Commands
+
+| Platform | Command | Example |
+|----------|---------|---------|
+| Telegram | `/search <query>` | `/search latest AI developments` |
+| Discord | `!search <query>` | `!search Python best practices` |
+
+### Search Capabilities
+
+- **Real-time Information**: Access current news, trends, and updates
+- **Comprehensive Analysis**: AI summarizes and synthesizes information from multiple sources
+- **Source Attribution**: Results include links to original sources
+- **Multi-language Support**: Search in different languages
+- **Contextual Responses**: Answers are tailored to your query's context
+
+### Examples
+
+**Research Queries:**
+```
+/search quantum computing breakthroughs 2024
+/search renewable energy trends in Europe
+/search machine learning frameworks comparison
+```
+
+**Current Events:**
+```
+/search presidential election results
+/search cryptocurrency market analysis
+/search climate change summit outcomes
+```
+
+**Technical Questions:**
+```
+/search how to implement OAuth2 in React
+/search Docker container security best practices
+/search Kubernetes vs Docker Swarm comparison
+```
+
+### Search Tips
+
+- **Be Specific**: More detailed queries yield better results
+- **Use Keywords**: Include important terms your search should contain
+- **Current Topics**: Great for news, trends, and recent developments
+- **Technical Queries**: Excellent for programming, tools, and frameworks
+- **Comparative Analysis**: Well-suited for "X vs Y" type questions
+
+### Limitations
+
+- **Internet Access Required**: Needs active internet connection
+- **API Rate Limits**: Subject to search provider limitations
+- **Content Freshness**: Results reflect current web content
+- **No Sensitive Data**: Avoid searching for personal or confidential information
+
+### Search Results Format
+
+The bot provides structured responses including:
+- **Summary**: AI-generated overview of findings
+- **Key Points**: Important information extracted
+- **Sources**: Links to original content
+- **Recommendations**: Suggested next steps or related topics
 
 ## 🔌 Extending the Bot
 
@@ -393,6 +465,12 @@ ENABLED_PLUGINS = "telegram,discord,myplugin"
 - Verify API keys are set correctly
 - Check API rate limits and quotas
 - Ensure provider service is available
+
+**Search function issues:**
+- Ensure internet connection is stable
+- Check if web_search plugin is enabled in ENABLED_PLUGINS
+- Verify search query is not empty or too short
+- Some regions may have search restrictions
 
 **Plugin loading issues:**
 - Check `ENABLED_PLUGINS` configuration
