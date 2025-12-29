@@ -341,9 +341,6 @@ class TelegramOllamaBot:
             # Process the message with AI
             logger.info("Sending message to AI for processing")
 
-            # Send thinking message
-            thinking_message = await update.message.reply_text("🤔 Thinking…")
-
             # Check for YouTube URLs first (highest priority)
             youtube_urls = self.youtube_summarizer.extract_video_urls(message_text)
 
@@ -395,6 +392,7 @@ class TelegramOllamaBot:
                 return
 
             # Regular chat message with conversation context
+            # Send thinking message
             thinking_message = await update.message.reply_text("🤔 Thinking…")
 
             # Add user message to conversation history

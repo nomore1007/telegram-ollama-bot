@@ -460,15 +460,15 @@ class LLMClient:
             parameters = tool.get('parameters', {})
 
             # Format tool description
-            param_desc = []
+            param_descs = []
             for param_name, param_info in parameters.items():
                 param_type = param_info.get('type', 'string')
-                param_desc = param_info.get('description', 'No description')
-                param_desc.append(f"  - {param_name} ({param_type}): {param_desc}")
+                param_description = param_info.get('description', 'No description')
+                param_descs.append(f"  - {param_name} ({param_type}): {param_description}")
 
             tool_descriptions.append(f"- {name}: {description}")
-            if param_desc:
-                tool_descriptions.extend(param_desc)
+            if param_descs:
+                tool_descriptions.extend(param_descs)
 
         tools_section = "\n".join(tool_descriptions)
 
