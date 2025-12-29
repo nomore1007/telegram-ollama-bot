@@ -65,20 +65,26 @@ class SettingsManager:
 
     def _load_settings_file(self, settings_file: Path):
         """Load settings from a Python file safely."""
-        # For security, we'll use a more controlled approach
-        # Read the file and parse it manually instead of using exec
-
         with open(settings_file, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Simple parsing - this is safer than exec()
-        # We'll look for variable assignments like: VARIABLE_NAME = value
+        # Use exec with restricted environment to parse the file
+        # This allows complex values like dicts and lists
+        globals_dict = {}
+        locals_dict = {}
 
-        lines = content.split('\n')
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith('#') or line.startswith('"""') or line.startswith("'''"):
-                continue
+        try:
+            # Execute with no builtins for security
+            exec(content, {'__builtins__': None}, locals_dict)
+
+            # Filter to only uppercase settings keys (convention for config)
+            for key, value in locals_dict.items():
+                if key.isupper():
+                    self.settings[key] = value
+
+        except Exception as e:
+            logger.error(f"Error loading settings from {settings_file}: {e}")
+            raise
 
             # Look for variable assignments
             if '=' in line and not line.startswith(' ') and not line.startswith('\t'):
