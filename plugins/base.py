@@ -55,7 +55,6 @@ class Plugin(ABC):
         """
         return {}
 
-    @abstractmethod
     def initialize(self, bot_instance) -> None:
         """
         Called when the plugin is loaded. Use this to set up any necessary state.
