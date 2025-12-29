@@ -74,8 +74,9 @@ class SettingsManager:
         locals_dict = {}
 
         try:
-            # Execute with no builtins for security
-            exec(content, {'__builtins__': None}, locals_dict)
+            # Execute the settings file with access to necessary modules
+            # Since this is a local config file, we provide standard globals
+            exec(content, globals(), locals_dict)
 
             # Filter to only uppercase settings keys (convention for config)
             for key, value in locals_dict.items():
@@ -86,62 +87,25 @@ class SettingsManager:
             logger.error(f"Error loading settings from {settings_file}: {e}")
             raise
 
-            # Look for variable assignments
-            if '=' in line and not line.startswith(' ') and not line.startswith('\t'):
-                try:
-                    # Split on first = only
-                    parts = line.split('=', 1)
-                    if len(parts) == 2:
-                        var_name = parts[0].split(':')[0].strip()
-                        var_value_str = parts[1].strip()
-
-                        # Skip if it looks like a complex expression or function call
-                        if any(char in var_value_str for char in ['(', ')', 'lambda', 'def', 'class']):
-                            continue
-
-                        # Try to evaluate the value safely
-                        try:
-                            # Create a safe evaluation environment
-                            safe_dict = {
-                                'os': os,
-                                'True': True,
-                                'False': False,
-                                'None': None,
-                                'int': int,
-                                'str': str,
-                                'float': float,
-                                'bool': bool,
-                                'list': list,
-                                'dict': dict,
-                            }
-
-                            var_value = eval(var_value_str, {"__builtins__": {}}, safe_dict)
-                            self.settings[var_name] = var_value
-
-                        except (ValueError, SyntaxError, NameError):
-                            # If we can't evaluate it safely, store as string
-                            # Remove quotes if present
-                            if (var_value_str.startswith('"') and var_value_str.endswith('"')) or \
-                               (var_value_str.startswith("'") and var_value_str.endswith("'")):
-                                var_value_str = var_value_str[1:-1]
-                            self.settings[var_name] = var_value_str
-
-                except Exception as e:
-                    logger.warning(f"Could not parse line '{line}': {e}")
-                    continue
-
     def _validate_required_settings(self):
         """Validate that required settings are present."""
         missing = []
 
-        # Check for Telegram bot token if telegram plugin is enabled
+        # Check for Telegram bot token
         enabled_plugins = self.settings.get('ENABLED_PLUGINS', [])
         if 'telegram' in enabled_plugins:
+            # Check new per-plugin format first
             plugins = self.settings.get('PLUGINS', {})
-            telegram_config = plugins.get('telegram', {})
-            bot_token = telegram_config.get('bot_token')
-            if not bot_token or (isinstance(bot_token, str) and bot_token.startswith('YOUR_') and bot_token.endswith('_HERE')):
-                missing.append('TELEGRAM_BOT_TOKEN (in PLUGINS["telegram"]["bot_token"])')
+            if plugins:
+                telegram_config = plugins.get('telegram', {})
+                bot_token = telegram_config.get('bot_token')
+                if not bot_token or (isinstance(bot_token, str) and bot_token.startswith('YOUR_') and bot_token.endswith('_HERE')):
+                    missing.append('TELEGRAM_BOT_TOKEN (in PLUGINS["telegram"]["bot_token"])')
+            else:
+                # Fallback to old global format for backward compatibility
+                bot_token = self.settings.get('TELEGRAM_BOT_TOKEN')
+                if not bot_token or (isinstance(bot_token, str) and bot_token.startswith('YOUR_') and bot_token.endswith('_HERE')):
+                    missing.append('TELEGRAM_BOT_TOKEN')
 
         # Check for Ollama host (still global)
         ollama_host = self.settings.get('OLLAMA_HOST')
