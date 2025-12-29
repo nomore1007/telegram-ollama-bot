@@ -440,12 +440,29 @@ class TelegramOllamaBot:
         if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
             print("🔍 DEBUG: Registering callback handlers...")
             logger.info("Registering callback handlers...")
-            app.add_handler(
-                CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
-            )
-            app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
-            print("🔍 DEBUG: Callback handlers registered")
+
+            # Create the handlers
+            model_handler = CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
+            menu_handler = CallbackQueryHandler(telegram_plugin.handle_menu_callback)
+
+            print(f"🔍 DEBUG: Created handlers - model: {model_handler}, menu: {menu_handler}")
+
+            # Add them to the app
+            app.add_handler(model_handler)
+            app.add_handler(menu_handler)
+
+            print("🔍 DEBUG: Callback handlers registered with Telegram app")
+            print(f"🔍 DEBUG: App handlers count: {len(app.handlers)}")
             logger.info("Callback handlers registered")
+
+            # Add a catch-all callback handler for debugging
+            async def debug_callback_handler(update, context):
+                print(f"🔍 CATCH-ALL CALLBACK: {update.callback_query.data if update.callback_query else 'NO DATA'}")
+                return False  # Don't consume the event
+
+            debug_handler = CallbackQueryHandler(debug_callback_handler)
+            app.add_handler(debug_handler, group=999)  # High group number so it runs after others
+            print("🔍 DEBUG: Added catch-all callback handler")
         else:
             print("🔍 DEBUG: ERROR - Telegram plugin not found or not enabled!")
             logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
