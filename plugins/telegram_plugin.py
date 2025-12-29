@@ -187,7 +187,7 @@ class TelegramPlugin(Plugin):
             print(f"🔍 MESSAGE SENT RESULT: {result}")
             print("🔍 MODEL MENU SENT")
 
-    async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_model(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
         if update.message:
             channel_id = str(update.effective_chat.id) if update.effective_chat else None
