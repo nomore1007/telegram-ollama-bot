@@ -477,164 +477,167 @@ class TelegramPlugin(Plugin):
 
         await query.answer()
 
-        if not query.data:
-            await query.edit_message_text("❌ Invalid callback data.")
-            return
-
-        action = query.data
-
-        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="show_menu")]])
-
-        if action == "model_info":
-            channel_id = query.message.chat.id if query.message and query.message.chat else None
-            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
-            text = (
-                f"🧠 *Model Information*\n\n"
-                f"🤖 Model: `{current_model}`\n"
-                f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
-                f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
-            )
-            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
-
-        elif action == "list_models":
-            channel_id = query.message.chat.id if query.message and query.message.chat else None
-            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-            provider = channel_settings.get('provider', 'ollama')
-            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
-            api_key = None
-            if provider != 'ollama':
-                api_key_env = f'{provider.upper()}_API_KEY'
-                api_key = getattr(self.bot.config, api_key_env, None)
-
-            from llm_client import LLMClient
-            try:
-                channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
-                models = await channel_llm.list_models()
-            except Exception as e:
-                await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
+        try:
+            if not query.data:
+                await query.edit_message_text("❌ Invalid callback data.")
                 return
 
-            if not models:
-                await query.edit_message_text("❌ No models found.", reply_markup=back_button)
-                return
+            action = query.data
 
-            text = "\n".join(f"• {m}" for m in models)
-            await query.edit_message_text(f"🤖 Available models for {provider}:\n{text}", reply_markup=back_button)
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
 
-        elif action == "change_model":
-            channel_id = query.message.chat.id if query.message and query.message.chat else None
-            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-            provider = channel_settings.get('provider', 'ollama')
-            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
-            api_key = None
-            if provider != 'ollama':
-                api_key_env = f'{provider.upper()}_API_KEY'
-                api_key = getattr(self.bot.config, api_key_env, None)
+            if action == "model_info":
+                channel_id = query.message.chat.id if query.message and query.message.chat else None
+                current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+                text = (
+                    f"🧠 *Model Information*\n\n"
+                    f"🤖 Model: `{current_model}`\n"
+                    f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
+                    f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
+                )
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
 
-            from llm_client import LLMClient
-            try:
-                channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
-                models = await channel_llm.list_models()
-            except Exception as e:
-                await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
-                return
+            elif action == "list_models":
+                channel_id = query.message.chat.id if query.message and query.message.chat else None
+                channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+                provider = channel_settings.get('provider', 'ollama')
+                host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+                api_key = None
+                if provider != 'ollama':
+                    api_key_env = f'{provider.upper()}_API_KEY'
+                    api_key = getattr(self.bot.config, api_key_env, None)
 
-            if not models:
-                await query.edit_message_text("❌ No models available.", reply_markup=back_button)
-                return
+                from llm_client import LLMClient
+                try:
+                    channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+                    models = await channel_llm.list_models()
+                except Exception as e:
+                    await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
+                    return
 
-            # Store models list for callback
-            if context.user_data is not None:
-                context.user_data['model_list'] = models
+                if not models:
+                    await query.edit_message_text("❌ No models found.", reply_markup=back_button)
+                    return
 
-            # Use index-based callback data to avoid length limits
-            keyboard = [
-                [InlineKeyboardButton(m, callback_data=f"changemodel:{idx}")]
-                for idx, m in enumerate(models)
-            ]
-            keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="show_menu")])
+                text = "\n".join(f"• {m}" for m in models)
+                await query.edit_message_text(f"🤖 Available models for {provider}:\n{text}", reply_markup=back_button)
 
-            current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
-            await query.edit_message_text(
-                f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            elif action == "change_model":
+                channel_id = query.message.chat.id if query.message and query.message.chat else None
+                channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+                provider = channel_settings.get('provider', 'ollama')
+                host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+                api_key = None
+                if provider != 'ollama':
+                    api_key_env = f'{provider.upper()}_API_KEY'
+                    api_key = getattr(self.bot.config, api_key_env, None)
 
-        elif action == "set_prompt":
-            await query.edit_message_text(
-                "💬 *Set Custom Prompt*\n\n"
-                "Use the command:\n`/setprompt Your custom prompt here`\n\n"
-                "Example:\n`/setprompt You are a helpful coding assistant`\n\n"
-                "This sets a custom system prompt for this channel.",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
+                from llm_client import LLMClient
+                try:
+                    channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+                    models = await channel_llm.list_models()
+                except Exception as e:
+                    await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
+                    return
 
-        elif action == "set_provider":
-            await query.edit_message_text(
-                "🌐 *Set AI Provider*\n\n"
-                "Use the command:\n`/setprovider <provider> [host]`\n\n"
-                "Examples:\n"
-                "`/setprovider ollama`\n"
-                "`/setprovider ollama http://remote:11434`\n"
-                "`/setprovider openai`\n"
-                "`/setprovider groq`\n\n"
-                "Supported: ollama, openai, groq, together, huggingface, anthropic\n\n"
-                "This sets the AI provider for this channel.",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
+                if not models:
+                    await query.edit_message_text("❌ No models available.", reply_markup=back_button)
+                    return
 
-        elif action == "help_menu":
-            help_text = (
-                "❓ *Help & Commands*\n\n"
-                "• *Menu Options* - Use /start to see interactive menu\n"
-                "• *Direct Chat* - Just send any message to talk with AI\n"
-                "• *News Summarization* - Send any message with a news link to auto-summarize!\n"
-                "• *YouTube Summarization* - Send any message with a YouTube link to auto-summarize!\n\n"
-                "*Available Commands:*\n"
-                "`/start` - Show main menu\n"
-                "`/help` - This help message\n"
-                "`/menu` - Show the main menu\n"
-                "`/model` - Show current model info\n"
-                "`/listmodels` - List available models\n"
-                "`/setmodel <model>` - Set AI model for this channel\n"
-                "`/changemodel` - Show model selection menu\n"
-                "`/setprovider <provider> [host]` - Set AI provider for this channel\n"
-                "`/setprompt` - Set custom AI prompt for this channel\n"
-                "`/timeout <seconds>` - Set request timeout\n\n"
-                "*News Summarizer Features:*\n"
-                "📰 *Auto-Detection:* Automatically detects news URLs in messages\n"
-                "🤖 *AI-Powered:* Uses AI to create comprehensive summaries\n"
-                "🌐 *Multi-Source:* Supports 30+ major news websites\n"
-                "📊 *Structured:* Provides key points and context\n\n"
-                "*YouTube Summarizer Features:*\n"
-                "🎬 *Auto-Detection:* Automatically detects YouTube URLs in messages\n"
-                "🎥 *Video Info:* Extracts title, channel, views, duration\n"
-                "📝 *Transcript:* Pulls video transcript using YouTube API\n"
-                "🤖 *AI-Powered:* Uses AI to summarize video content\n"
-                "🎯 *Smart:* Supports all YouTube URL formats (watch, shorts, embed)"
-            )
-            await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
+                # Store models list for callback
+                if context.user_data is not None:
+                    context.user_data['model_list'] = models
 
-        elif action == "show_menu":
-            keyboard = [
-                [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
-                [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
-                [InlineKeyboardButton("🔄 Change Model", callback_data="change_model")],
-                [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
-                [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
-                [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
-            ]
-            await query.edit_message_text(
-                "🤖 *Bot Menu*\n\nChoose an option:",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
+                # Use index-based callback data to avoid length limits
+                keyboard = [
+                    [InlineKeyboardButton(m, callback_data=f"changemodel:{idx}")]
+                    for idx, m in enumerate(models)
+                ]
+                keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="show_menu")])
 
-        else:
-            await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
+                current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
+                await query.edit_message_text(
+                    f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+            elif action == "set_prompt":
+                await query.edit_message_text(
+                    "💬 *Set Custom Prompt*\n\n"
+                    "Use the command:\n`/setprompt Your custom prompt here`\n\n"
+                    "Example:\n`/setprompt You are a helpful coding assistant`\n\n"
+                    "This sets a custom system prompt for this channel.",
+                    parse_mode="Markdown",
+                    reply_markup=back_button
+                )
+
+            elif action == "set_provider":
+                await query.edit_message_text(
+                    "🌐 *Set AI Provider*\n\n"
+                    "Use the command:\n`/setprovider <provider> [host]`\n\n"
+                    "Examples:\n"
+                    "`/setprovider ollama`\n"
+                    "`/setprovider ollama http://remote:11434`\n"
+                    "`/setprovider openai`\n"
+                    "`/setprovider groq`\n\n"
+                    "Supported: ollama, openai, groq, together, huggingface, anthropic\n\n"
+                    "This sets the AI provider for this channel.",
+                    parse_mode="Markdown",
+                    reply_markup=back_button
+                )
+
+            elif action == "help_menu":
+                help_text = (
+                    "❓ *Help & Commands*\n\n"
+                    "• *Menu Options* - Use /start to see interactive menu\n"
+                    "• *Direct Chat* - Just send any message to talk with AI\n"
+                    "• *News Summarization* - Send any message with a news link to auto-summarize!\n"
+                    "• *YouTube Summarization* - Send any message with a YouTube link to auto-summarize!\n\n"
+                    "*Available Commands:*\n"
+                    "`/start` - Show main menu\n"
+                    "`/help` - This help message\n"
+                    "`/menu` - Show the main menu\n"
+                    "`/model` - Show current model info\n"
+                    "`/listmodels` - List available models\n"
+                     "`/setmodel <model>` - Set AI model for this channel\n"
+                     "`/changemodel` - Show model selection menu\n"
+                    "`/timeout <seconds>` - Set request timeout\n\n"
+                    "*News Summarizer Features:*\n"
+                    "📰 *Auto-Detection:* Automatically detects news URLs in messages\n"
+                    "🤖 *AI-Powered:* Uses AI to create comprehensive summaries\n"
+                    "🌐 *Multi-Source:* Supports 30+ major news websites\n"
+                    "📊 *Structured:* Provides key points and context\n\n"
+                    "*YouTube Summarizer Features:*\n"
+                    "🎬 *Auto-Detection:* Automatically detects YouTube URLs in messages\n"
+                    "🎥 *Video Info:* Extracts title, channel, views, duration\n"
+                    "📝 *Transcript:* Pulls video transcript using YouTube API\n"
+                    "🤖 *AI-Powered:* Uses AI to summarize video content\n"
+                    "🎯 *Smart:* Supports all YouTube URL formats (watch, shorts, embed)"
+                )
+                await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
+
+            elif action == "back_to_menu" or action == "show_menu":
+                keyboard = [
+                    [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
+                    [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
+                    [InlineKeyboardButton("🔄 Change Model", callback_data="change_model")],
+                    [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
+                    [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
+                    [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                ]
+                await query.edit_message_text(
+                    "🤖 *Bot Menu*\n\nChoose an option:",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="Markdown"
+                )
+
+            else:
+                await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
+
+        except Exception as e:
+            logger.error(f"Menu callback error: {e}")
+            await query.edit_message_text("❌ An error occurred while processing your request.")
 
     @require_admin
     async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
