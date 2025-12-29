@@ -265,14 +265,19 @@ class TelegramOllamaBot:
             is_group_chat = chat_type in ["group", "supergroup"]
             bot_mentioned = False
 
+            logger.info(f"Message in {chat_type} chat, bot_username: {self.bot_username}")
+
             if is_group_chat:
+                logger.info(f"Group chat message: '{message_text}', checking for mention")
                 if self.bot_username and f"@{self.bot_username}" in message_text:
                     bot_mentioned = True
-                    # Remove bot mention from the message text for AI processing
+                    logger.info(f"Bot mentioned, processing message")
+                    # Remove bot mention from the message text
                     message_text = message_text.replace(f"@{self.bot_username}", "").strip()
                     # Remove any leading/trailing whitespace after removing mention
                     message_text = message_text.strip()
                 else:
+                    logger.info(f"Bot not mentioned in group chat, ignoring")
                     # If in group chat and bot not mentioned, ignore
                     return
 
