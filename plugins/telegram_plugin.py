@@ -47,7 +47,7 @@ class TelegramPlugin(Plugin):
         return [
             "start", "help", "menu", "model", "listmodels", "setmodel", "changemodel",
             "setprovider", "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
-            "personality", "setpersonality", "clear",
+            "personality", "setpersonality", "clear", "context",
             "setchannelmodel", "setchannelhost", "setchannelprovider", "setchannelprompt"
         ]
 
@@ -86,7 +86,8 @@ class TelegramPlugin(Plugin):
              "`/changemodel` - Show model selection menu\n"
             "`/setprovider <provider>` - Change AI provider (ollama/openai/groq/etc)\n"
             "`/setprompt` - Customize AI system prompt\n"
-            "`/timeout <seconds>` - Set response timeout (1-600s)\n\n"
+            "`/timeout <seconds>` - Set response timeout (1-600s)\n"
+            "`/context <limit>` - Set conversation context limit (10-1000 messages)\n\n"
             "🏢 *Channel Administration (Channel Admins Only):*\n"
             "`/setchannelmodel <model>` - Set AI model for this specific channel\n"
             "`/setchannelprovider <provider>` - Set AI provider for this channel\n"
@@ -418,6 +419,49 @@ class TelegramPlugin(Plugin):
             if update.message:
                 await update.message.reply_text(
                     "❌ Usage: /timeout <seconds> (1–600)"
+                )
+
+    @require_admin
+    async def handle_context(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /context command - set conversation context limit"""
+        try:
+            if not context.args or len(context.args) == 0:
+                # Show current context limit
+                current_limit = getattr(self.bot.conversation_manager, 'max_messages_per_user', 50)
+                if update.message:
+                    await update.message.reply_text(
+                        f"🧠 *Current Context Limit:* {current_limit} messages\n\n"
+                        "💡 *To change:* `/context <number>` (10-1000)\n"
+                        "📝 *What it does:* Limits how many messages the bot remembers per conversation",
+                        parse_mode="Markdown"
+                    )
+                return
+
+            # Parse the new limit
+            new_limit = int(context.args[0])
+            if not 10 <= new_limit <= 1000:
+                raise ValueError("Context limit out of range")
+
+            # Update the conversation manager
+            self.bot.conversation_manager.max_messages_per_user = new_limit
+
+            # Also update the deque maxlen for existing conversations
+            for chat_id, conversation in self.bot.conversation_manager.conversations.items():
+                # Create new deque with updated maxlen and copy existing messages
+                new_deque = deque(conversation, maxlen=new_limit)
+                self.bot.conversation_manager.conversations[chat_id] = new_deque
+
+            if update.message:
+                await update.message.reply_text(
+                    f"✅ Context limit set to {new_limit} messages\n\n"
+                    f"🧠 The bot will now remember up to {new_limit} messages per conversation"
+                )
+
+        except (IndexError, ValueError):
+            if update.message:
+                await update.message.reply_text(
+                    "❌ Usage: /context <number> (10–1000)\n\n"
+                    "💡 Example: `/context 100` (remember 100 messages)"
                 )
 
     @require_admin
