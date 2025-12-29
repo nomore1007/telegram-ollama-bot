@@ -111,7 +111,8 @@ class TelegramOllamaBot:
         for plugin_name in enabled_plugins:
             if plugin_name == 'telegram':
                 config = plugin_configs.get('telegram', {})
-                if not config.get('bot_token') or config.get('bot_token', '').startswith('YOUR_'):
+                bot_token = config.get('bot_token') if config else getattr(self.config, 'TELEGRAM_BOT_TOKEN', None)
+                if not bot_token or (isinstance(bot_token, str) and bot_token.startswith('YOUR_') and bot_token.endswith('_HERE')):
                     logger.warning(f"Telegram plugin disabled: bot_token not configured")
                     continue
             elif plugin_name == 'discord':
