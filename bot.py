@@ -18,7 +18,6 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     CallbackContext,
-    TypeHandler,
     filters,
 )
 from constants import (
@@ -237,6 +236,8 @@ class TelegramOllamaBot:
             if not message_text:
                 return
 
+            logger.info(f"Processing message: '{message_text[:50]}...' from chat {update.message.chat.id}")
+
             # SECURITY: Add message size limits
             MAX_MESSAGE_SIZE = 4096  # characters
             if len(message_text) > MAX_MESSAGE_SIZE:
@@ -258,6 +259,8 @@ class TelegramOllamaBot:
                 await update.message.reply_text(f"🚫 {validation_msg}")
                 return
 
+            logger.info("Security checks passed, processing message")
+
             chat_type = update.message.chat.type
             is_group_chat = chat_type in ["group", "supergroup"]
             bot_mentioned = False
@@ -274,7 +277,12 @@ class TelegramOllamaBot:
                     return
 
             # If not a group chat or bot was mentioned in a group chat
-            # (rest of your existing handle_message logic)
+            # Process the message with AI
+            logger.info("Sending message to AI for processing")
+
+            # Send thinking message
+            thinking_message = await update.message.reply_text("🤔 Thinking…")
+            logger.info("Thinking message sent")
 
             # Check for YouTube URLs first (highest priority)
             youtube_urls = self.youtube_summarizer.extract_video_urls(message_text)
@@ -361,7 +369,9 @@ class TelegramOllamaBot:
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
             # Generate response with full context
+            logger.info(f"Generating response with {channel_provider} provider, model {channel_model}")
             response = await channel_llm.generate(context)
+            logger.info(f"Generated response: {len(response)} characters")
 
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)
@@ -443,7 +453,6 @@ class TelegramOllamaBot:
 
             logger.info("Callback handlers registered")
         else:
-            print("🔍 DEBUG: ERROR - Telegram plugin not found or not enabled!")
             logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
         # Legacy callback handlers removed - using plugin system
