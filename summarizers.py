@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from newspaper import Article
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import pytube
+import aiohttp
 
 from constants import (
     ARTICLE_MAX_TEXT_LENGTH, TRANSCRIPT_MAX_LENGTH,
@@ -76,25 +77,51 @@ class NewsSummarizer:
             error_type = type(e).__name__
             logger.error(f"Error extracting article from {url}: {error_type}")
 
-            # Check if this is a paywall/access issue - try archive.is fallback
+            # Check if this is a paywall/access issue - try multiple archive fallbacks
             is_access_blocked = (
                 "403" in str(e) or
                 "forbidden" in str(e).lower() or
                 "paywall" in str(e).lower() or
-                "subscription" in str(e).lower()
+                "subscription" in str(e).lower() or
+                "blocked" in str(e).lower()
             )
 
             if is_access_blocked:
-                logger.info(f"Trying archive.is fallback for {url}")
+                logger.info(f"Access blocked, trying archive fallbacks for {url}")
+
+                # Try multiple archive services in order
+                archive_services = [
+                    ("archive.is", self._extract_from_archive_is),
+                    ("web.archive.org", self._extract_from_wayback_machine),
+                    ("archive.today", self._extract_from_archive_today),
+                ]
+
+                for service_name, extractor_func in archive_services:
+                    logger.info(f"Trying {service_name} fallback for {url}")
+                    try:
+                        archive_result = await extractor_func(url)
+                        if archive_result["success"]:
+                            logger.info(f"Successfully extracted article from {service_name} for {url}")
+                            return archive_result
+                        else:
+                            logger.warning(f"{service_name} fallback failed for {url}")
+                    except Exception as archive_e:
+                        logger.error(f"{service_name} fallback failed for {url}: {type(archive_e).__name__}")
+                        continue
+
+                # If all archives failed, try alternative extraction methods
+                logger.info(f"Trying alternative extraction methods for {url}")
                 try:
-                    archive_result = await self._extract_from_archive(url)
-                    if archive_result["success"]:
-                        logger.info(f"Successfully extracted article from archive.is for {url}")
-                        return archive_result
+                    alt_result = await self._extract_with_alternative_methods(url)
+                    if alt_result["success"]:
+                        logger.info(f"Successfully extracted article using alternative methods for {url}")
+                        return alt_result
                     else:
-                        logger.warning(f"Archive.is fallback also failed for {url}")
-                except Exception as archive_e:
-                    logger.error(f"Archive.is fallback failed for {url}: {type(archive_e).__name__}")
+                        logger.warning(f"Alternative extraction methods also failed for {url}")
+                except Exception as alt_e:
+                    logger.error(f"Alternative extraction failed for {url}: {type(alt_e).__name__}")
+
+                logger.warning(f"All extraction methods failed for {url}")
 
             # Provide more user-friendly error messages
             if "timeout" in str(e).lower() or error_type == "TimeoutError":
@@ -110,7 +137,7 @@ class NewsSummarizer:
 
             return {"success": False, "error": error_msg}
 
-    async def _extract_from_archive(self, url: str) -> dict:
+    async def _extract_from_archive_is(self, url: str) -> dict:
         """Try to extract article from archive.is as fallback for blocked content"""
         try:
             # Create archive.is URL
@@ -146,6 +173,165 @@ class NewsSummarizer:
         except Exception as e:
             logger.error(f"Error extracting from archive.is for {url}: {type(e).__name__}")
             return {"success": False, "error": f"Archive extraction failed: {type(e).__name__}"}
+
+    async def _extract_from_wayback_machine(self, url: str) -> dict:
+        """Try to extract article from Internet Archive Wayback Machine"""
+        try:
+            # First get the latest available snapshot
+            availability_url = f"https://archive.org/wayback/available?url={url}"
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(availability_url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        snapshots = data.get("archived_snapshots", {})
+                        closest = snapshots.get("closest")
+
+                        if closest and closest.get("available"):
+                            archive_url = closest["url"]
+                        else:
+                            # Fallback: try a common archived URL pattern
+                            archive_url = f"https://web.archive.org/web/20240000000000*/{url}"
+                    else:
+                        return {"success": False, "error": "Could not find archived version"}
+
+            # Extract from the archived URL
+            article = Article(archive_url)
+
+            await asyncio.wait_for(
+                asyncio.to_thread(article.download),
+                timeout=45.0
+            )
+            await asyncio.wait_for(
+                asyncio.to_thread(article.parse),
+                timeout=20.0
+            )
+
+            if not article.title or not article.text:
+                return {"success": False, "error": "Could not extract archived article content"}
+
+            return {
+                "success": True,
+                "title": f"[Archived] {article.title}",
+                "text": article.text,
+                "url": archive_url,
+                "authors": article.authors,
+                "publish_date": article.publish_date,
+                "summary": article.summary if hasattr(article, 'summary') else None,
+                "source": "wayback machine"
+            }
+
+        except Exception as e:
+            logger.error(f"Error extracting from Wayback Machine for {url}: {type(e).__name__}")
+            return {"success": False, "error": f"Wayback Machine extraction failed: {type(e).__name__}"}
+
+    async def _extract_from_archive_today(self, url: str) -> dict:
+        """Try to extract article from archive.today"""
+        try:
+            # Create archive.today URL
+            archive_url = f"https://archive.today/{url}"
+
+            article = Article(archive_url)
+
+            await asyncio.wait_for(
+                asyncio.to_thread(article.download),
+                timeout=45.0
+            )
+            await asyncio.wait_for(
+                asyncio.to_thread(article.parse),
+                timeout=20.0
+            )
+
+            if not article.title or not article.text:
+                return {"success": False, "error": "Could not extract archived article content"}
+
+            return {
+                "success": True,
+                "title": f"[Archived] {article.title}",
+                "text": article.text,
+                "url": archive_url,
+                "authors": article.authors,
+                "publish_date": article.publish_date,
+                "summary": article.summary if hasattr(article, 'summary') else None,
+                "source": "archive.today"
+            }
+
+        except Exception as e:
+            logger.error(f"Error extracting from archive.today for {url}: {type(e).__name__}")
+            return {"success": False, "error": f"Archive.today extraction failed: {type(e).__name__}"}
+
+    async def _extract_with_alternative_methods(self, url: str) -> dict:
+        """Try alternative extraction methods when archives fail"""
+        try:
+            # Method 1: Try with different User-Agent
+            import aiohttp
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(url, timeout=30) as response:
+                    if response.status == 200:
+                        html_content = await response.text()
+
+                        # Try to extract with newspaper but with raw HTML
+                        article = Article(url)
+                        article.set_html(html_content)
+
+                        await asyncio.wait_for(
+                            asyncio.to_thread(article.parse),
+                            timeout=15.0
+                        )
+
+                        if article.title and article.text:
+                            return {
+                                "success": True,
+                                "title": article.title,
+                                "text": article.text,
+                                "url": url,
+                                "authors": article.authors,
+                                "publish_date": article.publish_date,
+                                "summary": article.summary if hasattr(article, 'summary') else None,
+                                "source": "direct with headers"
+                            }
+
+            # Method 2: Try with readability-based extraction
+            try:
+                from readability import Document
+                import requests
+
+                response = requests.get(url, headers=headers, timeout=30)
+                if response.status_code == 200:
+                    doc = Document(response.text)
+                    title = doc.title()
+                    content = doc.summary()
+
+                    if title and content:
+                        # Clean up HTML tags from content
+                        import re
+                        clean_content = re.sub(r'<[^>]+>', '', content)
+                        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+
+                        if len(clean_content) > 200:  # Minimum content length
+                            return {
+                                "success": True,
+                                "title": title,
+                                "text": clean_content,
+                                "url": url,
+                                "authors": [],
+                                "publish_date": None,
+                                "summary": None,
+                                "source": "readability extraction"
+                            }
+            except ImportError:
+                logger.debug("Readability library not available, skipping alternative extraction")
+            except Exception as readability_e:
+                logger.debug(f"Readability extraction failed: {type(readability_e).__name__}")
+
+        except Exception as e:
+            logger.error(f"Alternative extraction methods failed for {url}: {type(e).__name__}")
+
+        return {"success": False, "error": "All extraction methods failed"}
 
     async def summarize_with_ai(self, article_data: dict) -> str:
         """Use AI to summarize the article"""
@@ -205,9 +391,21 @@ Keep it informative but concise."""
         # Check if this came from archive
         source_indicator = ""
         source_url = url
-        if article_data.get("source") == "archive.is":
+        source_type = article_data.get("source", "original")
+
+        if source_type == "archive.is":
             source_indicator = "📚 *Archived Content* (accessed via archive.is)\n"
             source_url = article_data.get("url", url)
+        elif source_type == "wayback machine":
+            source_indicator = "📚 *Archived Content* (accessed via Internet Archive)\n"
+            source_url = article_data.get("url", url)
+        elif source_type == "archive.today":
+            source_indicator = "📚 *Archived Content* (accessed via archive.today)\n"
+            source_url = article_data.get("url", url)
+        elif source_type == "direct with headers":
+            source_indicator = "📄 *Content extracted* (using alternative headers)\n"
+        elif source_type == "readability extraction":
+            source_indicator = "📄 *Content extracted* (using readability parser)\n"
 
         response = f"📰 *{title}*\n\n"
         if source_indicator:
