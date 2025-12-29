@@ -469,11 +469,18 @@ class TelegramPlugin(Plugin):
 
     async def handle_menu_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle menu callbacks"""
+        logger.info(f"=== MENU CALLBACK RECEIVED ===")
+        logger.info(f"Update: {update}")
+        logger.info(f"Callback query: {update.callback_query}")
+
         query = update.callback_query
         if not query:
+            logger.error("No callback query found!")
             return
 
+        logger.info(f"Callback data: {query.data}")
         await query.answer()
+        logger.info("Query answered")
 
         try:
             if not query.data:
@@ -633,16 +640,29 @@ class TelegramPlugin(Plugin):
 
         except Exception as e:
             logger.error(f"Menu callback error: {e}")
-            await query.edit_message_text("❌ An error occurred while processing your request.")
+            logger.error(f"Callback data was: {query.data}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            try:
+                await query.edit_message_text("❌ An error occurred while processing your request.")
+            except Exception as e2:
+                logger.error(f"Failed to send error message: {e2}")
 
     @require_admin
     async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle model selection callbacks"""
+        logger.info(f"=== MODEL CALLBACK RECEIVED ===")
+        logger.info(f"Update: {update}")
+        logger.info(f"Callback query: {update.callback_query}")
+
         query = update.callback_query
         if not query:
+            logger.error("No callback query found!")
             return
 
+        logger.info(f"Callback data: {query.data}")
         await query.answer()
+        logger.info("Query answered")
 
         try:
             if not query.data:
@@ -682,10 +702,15 @@ class TelegramPlugin(Plugin):
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
             )
 
-        except (ValueError, IndexError) as e:
+        except Exception as e:
             logger.error(f"Model callback error: {e}")
-            if query:
-                await query.edit_message_text("❌ Failed to update model.")
+            logger.error(f"Callback data was: {query.data}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            try:
+                await query.edit_message_text("❌ An error occurred while processing your model selection.")
+            except Exception as e2:
+                logger.error(f"Failed to send error message: {e2}")
 
     # Helper methods (similar to original handlers.py)
 

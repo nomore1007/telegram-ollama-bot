@@ -428,11 +428,17 @@ class TelegramOllamaBot:
 
         # Callback query handlers from plugins
         telegram_plugin = plugin_manager.plugins.get("telegram")
+        logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
+        logger.info(f"Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
         if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
+            logger.info("Registering callback handlers...")
             app.add_handler(
                 CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
             )
             app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
+            logger.info("Callback handlers registered")
+        else:
+            logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
         # Legacy callback handlers removed - using plugin system
 
