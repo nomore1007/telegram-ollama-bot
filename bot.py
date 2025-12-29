@@ -9,6 +9,8 @@ import os
 # Load settings using the settings manager
 from settings_manager import settings_manager, settings, config
 
+print("🔍 BOT MODULE LOADED - Settings imported")
+
 from telegram import Update, BotCommand
 from telegram.ext import (
     Application,
@@ -483,6 +485,7 @@ OllamaClient = LLMClient  # For backward compatibility with tests
 # -------------------------------------------------------------------
 
 def main():
+    print("🔍 MAIN FUNCTION STARTED")
     bot = TelegramOllamaBot(settings)
 
     # Run Discord bot in background if enabled
