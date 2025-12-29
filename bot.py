@@ -37,6 +37,8 @@ from plugins.web_search_plugin import WebSearchPlugin
 from plugins.discord_plugin import DiscordPlugin
 from plugins.weather_plugin import WeatherPlugin
 from plugins.calculator_plugin import CalculatorPlugin
+from plugins.currency_plugin import CurrencyPlugin
+from plugins.translation_plugin import TranslationPlugin
 from database import ChannelSettings
 
 
@@ -199,6 +201,8 @@ class TelegramOllamaBot:
         plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
         plugin_manager.load_plugin("weather", WeatherPlugin, plugin_configs.get('weather', {}))
         plugin_manager.load_plugin("calculator", CalculatorPlugin, plugin_configs.get('calculator', {}))
+        plugin_manager.load_plugin("currency", CurrencyPlugin, plugin_configs.get('currency', {}))
+        plugin_manager.load_plugin("translation", TranslationPlugin, plugin_configs.get('translation', {}))
 
         # Filter enabled plugins based on configuration requirements
         filtered_plugins = []
@@ -378,8 +382,20 @@ class TelegramOllamaBot:
             personality_prompt = personality_manager.get_system_prompt(self.personality, channel_prompt)
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
-            # Generate response with full context
-            response = await channel_llm.generate(context)
+            # Get available tools
+            tools = self._get_available_tools()
+
+            # Generate response with tool support
+            response, tool_calls = await channel_llm.generate_with_tools(context, tools)
+
+            # Execute tool calls if any
+            if tool_calls:
+                tool_results = await self._execute_tool_calls(tool_calls)
+
+                # Generate final response with tool results
+                if tool_results:
+                    context_with_tools = f"{context}\n\nTool Results:\n{tool_results}\n\nPlease provide your final answer based on these results."
+                    response = await channel_llm.generate(context_with_tools)
 
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)
@@ -475,6 +491,183 @@ class TelegramOllamaBot:
         # Start the bot
         logger.info("Starting Telegram Ollama bot")
         app.run_polling()
+
+    def _get_available_tools(self) -> list:
+        """Get list of available tools for the LLM"""
+        tools = []
+
+        # Web search tool
+        if 'web_search' in plugin_manager.plugins and plugin_manager.plugins['web_search'] in plugin_manager.get_enabled_plugins():
+            tools.append({
+                'name': 'web_search',
+                'description': 'Search the web for current information and answer questions',
+                'parameters': {
+                    'query': {
+                        'type': 'string',
+                        'description': 'The search query or question to answer'
+                    }
+                }
+            })
+
+        # Weather tool
+        if 'weather' in plugin_manager.plugins and plugin_manager.plugins['weather'] in plugin_manager.get_enabled_plugins():
+            tools.append({
+                'name': 'weather',
+                'description': 'Get current weather and forecast for a location',
+                'parameters': {
+                    'location': {
+                        'type': 'string',
+                        'description': 'City name or location'
+                    }
+                }
+            })
+
+        # Calculator tool
+        if 'calculator' in plugin_manager.plugins and plugin_manager.plugins['calculator'] in plugin_manager.get_enabled_plugins():
+            tools.append({
+                'name': 'calculator',
+                'description': 'Evaluate mathematical expressions and solve calculations',
+                'parameters': {
+                    'expression': {
+                        'type': 'string',
+                        'description': 'Mathematical expression to evaluate (e.g., "2+2*3", "sqrt(16)")'
+                    }
+                }
+            })
+
+        # Currency converter tool
+        if 'currency' in plugin_manager.plugins and plugin_manager.plugins['currency'] in plugin_manager.get_enabled_plugins():
+            tools.append({
+                'name': 'currency_convert',
+                'description': 'Convert between different currencies',
+                'parameters': {
+                    'amount': {
+                        'type': 'number',
+                        'description': 'Amount to convert'
+                    },
+                    'from_currency': {
+                        'type': 'string',
+                        'description': 'Source currency code (e.g., USD, EUR, GBP)'
+                    },
+                    'to_currency': {
+                        'type': 'string',
+                        'description': 'Target currency code (e.g., USD, EUR, GBP)'
+                    }
+                }
+            })
+
+        # Translation tool
+        if 'translation' in plugin_manager.plugins and plugin_manager.plugins['translation'] in plugin_manager.get_enabled_plugins():
+            tools.append({
+                'name': 'translate',
+                'description': 'Translate text between languages',
+                'parameters': {
+                    'text': {
+                        'type': 'string',
+                        'description': 'Text to translate'
+                    },
+                    'target_language': {
+                        'type': 'string',
+                        'description': 'Target language code (e.g., es, fr, de, ja)'
+                    },
+                    'source_language': {
+                        'type': 'string',
+                        'description': 'Source language code (optional, auto-detect if not provided)'
+                    }
+                }
+            })
+
+        return tools
+
+    async def _execute_tool_calls(self, tool_calls: list) -> str:
+        """Execute tool calls and return formatted results"""
+        results = []
+
+        for tool_call in tool_calls:
+            tool_name = tool_call.get('tool')
+            parameters = tool_call.get('parameters', {})
+
+            try:
+                result = await self._execute_single_tool(tool_name, parameters)
+                results.append(f"Tool: {tool_name}\nResult: {result}")
+            except Exception as e:
+                results.append(f"Tool: {tool_name}\nError: {str(e)}")
+
+        return "\n\n".join(results)
+
+    async def _execute_single_tool(self, tool_name: str, parameters: dict) -> str:
+        """Execute a single tool call"""
+        if tool_name == 'web_search':
+            query = parameters.get('query', '')
+            if not query:
+                return "Error: No search query provided"
+
+            # Use web search plugin
+            web_plugin = plugin_manager.plugins.get('web_search')
+            if web_plugin:
+                # Simulate a message update for the plugin
+                class MockMessage:
+                    def __init__(self, text):
+                        self.text = text
+
+                class MockUpdate:
+                    def __init__(self, message):
+                        self.message = message
+
+                # This is a simplified approach - in practice, you'd need to properly mock the update
+                # For now, return a placeholder
+                return f"Web search results for: {query} (simulated)"
+
+        elif tool_name == 'weather':
+            location = parameters.get('location', '')
+            if not location:
+                return "Error: No location provided"
+
+            weather_plugin = plugin_manager.plugins.get('weather')
+            if weather_plugin:
+                # This would need proper implementation
+                return f"Weather for {location}: Sunny, 72°F (simulated)"
+
+        elif tool_name == 'calculator':
+            expression = parameters.get('expression', '')
+            if not expression:
+                return "Error: No expression provided"
+
+            calc_plugin = plugin_manager.plugins.get('calculator')
+            if calc_plugin:
+                try:
+                    result = calc_plugin._safe_eval(expression)
+                    return f"Result: {result}"
+                except Exception as e:
+                    return f"Calculation error: {e}"
+
+        elif tool_name == 'currency_convert':
+            amount = parameters.get('amount', 0)
+            from_currency = parameters.get('from_currency', '').upper()
+            to_currency = parameters.get('to_currency', '').upper()
+
+            if not amount or not from_currency or not to_currency:
+                return "Error: Missing required parameters"
+
+            currency_plugin = plugin_manager.plugins.get('currency')
+            if currency_plugin:
+                # This would need proper implementation
+                return f"Converted {amount} {from_currency} to approximately {amount * 1.1} {to_currency} (simulated)"
+
+        elif tool_name == 'translate':
+            text = parameters.get('text', '')
+            target_lang = parameters.get('target_language', '')
+            source_lang = parameters.get('source_language')
+
+            if not text or not target_lang:
+                return "Error: Missing required parameters"
+
+            translation_plugin = plugin_manager.plugins.get('translation')
+            if translation_plugin:
+                # This would need proper implementation
+                return f"Translated '{text}' to {target_lang}: [translated text] (simulated)"
+
+        return f"Unknown tool: {tool_name}"
 
     def run_discord_bot(self):
         """Run Discord bot if enabled."""

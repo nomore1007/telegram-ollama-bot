@@ -428,3 +428,82 @@ class LLMClient:
     def set_timeout(self, timeout: int):
         """Set timeout"""
         self.provider.timeout = timeout
+
+    async def generate_with_tools(self, prompt: str, tools: list = None, **kwargs) -> tuple[str, list]:
+        """Generate response with tool calling capability
+
+        Returns:
+            tuple: (response_text, tool_calls)
+                - response_text: The LLM's response
+                - tool_calls: List of tool calls made during generation
+        """
+        if not tools:
+            # No tools, just generate normally
+            response = await self.generate(prompt, **kwargs)
+            return response, []
+
+        # Add tool instructions to the prompt
+        tool_prompt = self._build_tool_prompt(prompt, tools)
+        response = await self.generate(tool_prompt, **kwargs)
+
+        # Parse tool calls from response
+        tool_calls = self._parse_tool_calls(response)
+
+        return response, tool_calls
+
+    def _build_tool_prompt(self, original_prompt: str, tools: list) -> str:
+        """Build a prompt that includes tool instructions"""
+        tool_descriptions = []
+        for tool in tools:
+            name = tool.get('name', 'unknown')
+            description = tool.get('description', 'No description')
+            parameters = tool.get('parameters', {})
+
+            # Format tool description
+            param_desc = []
+            for param_name, param_info in parameters.items():
+                param_type = param_info.get('type', 'string')
+                param_desc = param_info.get('description', 'No description')
+                param_desc.append(f"  - {param_name} ({param_type}): {param_desc}")
+
+            tool_descriptions.append(f"- {name}: {description}")
+            if param_desc:
+                tool_descriptions.extend(param_desc)
+
+        tools_section = "\n".join(tool_descriptions)
+
+        enhanced_prompt = f"""{original_prompt}
+
+You have access to the following tools:
+
+{tools_section}
+
+To use a tool, respond with a JSON object in this format:
+TOOL_CALL: {{"tool": "tool_name", "parameters": {{"param1": "value1", "param2": "value2"}}}}
+
+You can make multiple tool calls if needed. After receiving tool results, provide your final answer.
+
+If you don't need to use any tools, just respond normally."""
+
+        return enhanced_prompt
+
+    def _parse_tool_calls(self, response: str) -> list:
+        """Parse tool calls from LLM response"""
+        import re
+        import json
+
+        tool_calls = []
+
+        # Look for TOOL_CALL: JSON patterns
+        tool_pattern = r'TOOL_CALL:\s*(\{.*?\})'
+        matches = re.findall(tool_pattern, response, re.DOTALL)
+
+        for match in matches:
+            try:
+                tool_call = json.loads(match.strip())
+                if isinstance(tool_call, dict) and 'tool' in tool_call:
+                    tool_calls.append(tool_call)
+            except json.JSONDecodeError:
+                continue
+
+        return tool_calls
