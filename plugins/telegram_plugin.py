@@ -172,14 +172,15 @@ class TelegramPlugin(Plugin):
         """Handle /menu command"""
         if update.message:
             keyboard = [
-                [InlineKeyboardButton("💬 Chat", callback_data="chat")],
-                [InlineKeyboardButton("📰 News Summarizer", callback_data="news")],
-                [InlineKeyboardButton("🎬 YouTube Summarizer", callback_data="youtube")],
-                [InlineKeyboardButton("⚙️ Model Settings", callback_data="model")],
-                [InlineKeyboardButton("❓ Help", callback_data="help")],
+                [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
+                [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
+                [InlineKeyboardButton("🔄 Change Model", callback_data="change_model")],
+                [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
+                [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
+                [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
             ]
             await update.message.reply_text(
-                "🤖 *Main Menu*\n\nChoose an option:",
+                "🤖 *Bot Menu*\n\nChoose an option:",
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
@@ -482,82 +483,156 @@ class TelegramPlugin(Plugin):
 
         action = query.data
 
-        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
+        back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="show_menu")]])
 
-        if action == "chat":
-            await query.edit_message_text(
-                "💬 *Chat Mode*\n\n"
-                "Just send me any message and I'll respond using the AI model.\n\n"
-                f"🧠 Current model: `{self.bot.config.OLLAMA_MODEL}`",
-                parse_mode="Markdown",
-                reply_markup=back_button
+        if action == "model_info":
+            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+            text = (
+                f"🧠 *Model Information*\n\n"
+                f"🤖 Model: `{current_model}`\n"
+                f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
+                f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
             )
-        elif action == "news":
-            await query.edit_message_text(
-                "📰 *News Summarizer*\n\n"
-                "🤖 *Automatic Detection:* Simply send any message containing a news article link and I'll automatically summarize it!\n\n"
-                "📋 *Supported Sites:* BBC, CNN, Reuters, NY Times, Washington Post, Guardian, WSJ, Bloomberg, NBC News, ABC News, CBS News, Fox News, AP News, NPR, Vox, Politico, Wired, TechCrunch, and many more!\n\n"
-                "💡 *Example:* \"Check out this article: https://www.bbc.com/news/some-story\"\n\n"
-                "🚀 *Limit:* Up to 2 articles per message to prevent spam.",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
-        elif action == "youtube":
-            await query.edit_message_text(
-                "🎬 *YouTube Summarizer*\n\n"
-                "🤖 *Automatic Detection:* Simply send any message containing a YouTube link and I'll automatically summarize the video!\n\n"
-                "📋 *Supported Formats:* Regular videos, shorts, embedded videos, and all YouTube URL variations\n\n"
-                "💡 *Examples:*\n"
-                "• \"Watch this: https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n"
-                "• \"Amazing short: https://youtu.be/dQw4w9WgXcQ\"\n"
-                "• \"Check out: https://www.youtube.com/shorts/VIDEO_ID\"\n\n"
-                "🎯 *Features:* Video info, transcript extraction, AI-powered summary\n"
-                "🚀 *Limit:* Up to 2 videos per message to prevent spam.",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
-        elif action == "model":
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
+
+        elif action == "list_models":
+            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+            provider = channel_settings.get('provider', 'ollama')
+            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+            api_key = None
+            if provider != 'ollama':
+                api_key_env = f'{provider.upper()}_API_KEY'
+                api_key = getattr(self.bot.config, api_key_env, None)
+
+            from llm_client import LLMClient
+            try:
+                channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+                models = await channel_llm.list_models()
+            except Exception as e:
+                await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
+                return
+
+            if not models:
+                await query.edit_message_text("❌ No models found.", reply_markup=back_button)
+                return
+
+            text = "\n".join(f"• {m}" for m in models)
+            await query.edit_message_text(f"🤖 Available models for {provider}:\n{text}", reply_markup=back_button)
+
+        elif action == "change_model":
+            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+            provider = channel_settings.get('provider', 'ollama')
+            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+            api_key = None
+            if provider != 'ollama':
+                api_key_env = f'{provider.upper()}_API_KEY'
+                api_key = getattr(self.bot.config, api_key_env, None)
+
+            from llm_client import LLMClient
+            try:
+                channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+                models = await channel_llm.list_models()
+            except Exception as e:
+                await query.edit_message_text(f"❌ Error accessing LLM: {e}", reply_markup=back_button)
+                return
+
+            if not models:
+                await query.edit_message_text("❌ No models available.", reply_markup=back_button)
+                return
+
+            # Store models list for callback
+            if context.user_data is not None:
+                context.user_data['model_list'] = models
+
+            # Use index-based callback data to avoid length limits
             keyboard = [
-                [InlineKeyboardButton("Show Info", callback_data="model_info")],
-                [InlineKeyboardButton("List Models", callback_data="listmodels")],
-                [InlineKeyboardButton("Change Model", callback_data="changemodel")],
-                [InlineKeyboardButton("Set Ollama Host", callback_data="set_ollama_host")],
-                [InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")],
+                [InlineKeyboardButton(m, callback_data=f"changemodel:{idx}")]
+                for idx, m in enumerate(models)
+            ]
+            keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="show_menu")])
+
+            current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
+            await query.edit_message_text(
+                f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        elif action == "set_prompt":
+            await query.edit_message_text(
+                "💬 *Set Custom Prompt*\n\n"
+                "Use the command:\n`/setprompt Your custom prompt here`\n\n"
+                "Example:\n`/setprompt You are a helpful coding assistant`\n\n"
+                "This sets a custom system prompt for this channel.",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+
+        elif action == "set_provider":
+            await query.edit_message_text(
+                "🌐 *Set AI Provider*\n\n"
+                "Use the command:\n`/setprovider <provider> [host]`\n\n"
+                "Examples:\n"
+                "`/setprovider ollama`\n"
+                "`/setprovider ollama http://remote:11434`\n"
+                "`/setprovider openai`\n"
+                "`/setprovider groq`\n\n"
+                "Supported: ollama, openai, groq, together, huggingface, anthropic\n\n"
+                "This sets the AI provider for this channel.",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
+
+        elif action == "help_menu":
+            help_text = (
+                "❓ *Help & Commands*\n\n"
+                "• *Menu Options* - Use /start to see interactive menu\n"
+                "• *Direct Chat* - Just send any message to talk with AI\n"
+                "• *News Summarization* - Send any message with a news link to auto-summarize!\n"
+                "• *YouTube Summarization* - Send any message with a YouTube link to auto-summarize!\n\n"
+                "*Available Commands:*\n"
+                "`/start` - Show main menu\n"
+                "`/help` - This help message\n"
+                "`/menu` - Show the main menu\n"
+                "`/model` - Show current model info\n"
+                "`/listmodels` - List available models\n"
+                "`/setmodel <model>` - Set AI model for this channel\n"
+                "`/changemodel` - Show model selection menu\n"
+                "`/setprovider <provider> [host]` - Set AI provider for this channel\n"
+                "`/setprompt` - Set custom AI prompt for this channel\n"
+                "`/timeout <seconds>` - Set request timeout\n\n"
+                "*News Summarizer Features:*\n"
+                "📰 *Auto-Detection:* Automatically detects news URLs in messages\n"
+                "🤖 *AI-Powered:* Uses AI to create comprehensive summaries\n"
+                "🌐 *Multi-Source:* Supports 30+ major news websites\n"
+                "📊 *Structured:* Provides key points and context\n\n"
+                "*YouTube Summarizer Features:*\n"
+                "🎬 *Auto-Detection:* Automatically detects YouTube URLs in messages\n"
+                "🎥 *Video Info:* Extracts title, channel, views, duration\n"
+                "📝 *Transcript:* Pulls video transcript using YouTube API\n"
+                "🤖 *AI-Powered:* Uses AI to summarize video content\n"
+                "🎯 *Smart:* Supports all YouTube URL formats (watch, shorts, embed)"
+            )
+            await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
+
+        elif action == "show_menu":
+            keyboard = [
+                [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
+                [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
+                [InlineKeyboardButton("🔄 Change Model", callback_data="change_model")],
+                [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
+                [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
+                [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
             ]
             await query.edit_message_text(
-                "⚙️ *Model Settings*\n\nChoose an option:",
+                "🤖 *Bot Menu*\n\nChoose an option:",
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
-        elif action == "listmodels":
-            await self._show_models_list(query)
-        elif action == "changemodel":
-            await self._show_model_selection(query, context)
-        elif action == "model_info":
-            await self._show_model_info(query)
-        elif action == "set_ollama_host":
-            await query.edit_message_text(
-                "🌐 *Set Ollama Host*\n\n"
-                "Use the command:\n`/setprovider ollama <host>`\n\n"
-                "Example:\n`/setprovider ollama http://localhost:11434`\n"
-                "Or for remote:\n`/setprovider ollama http://remote-server:11434`\n\n"
-                "This sets the Ollama host for this channel.",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
-        elif action == "timeout":
-            await query.edit_message_text(
-                "⏱️ *Set Timeout*\n\n"
-                "Use the command:\n`/timeout <seconds>`\n\n"
-                "Valid range: 1-600 seconds\n"
-                f"Current timeout: `{self.bot.config.TIMEOUT}s`",
-                parse_mode="Markdown",
-                reply_markup=back_button
-            )
-        elif action == "help":
-            await self._show_help(query)
-        elif action == "back_to_menu":
-            await self.show_menu_query(query)
+
         else:
             await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
 
