@@ -206,7 +206,7 @@ class TelegramPlugin(Plugin):
         channel_id = update.effective_chat.id if update.effective_chat else None
         channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
         provider = channel_settings.get('provider', 'ollama')
-        host = channel_settings.get('host') if provider == 'ollama' else None
+        host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
         api_key = None
         if provider != 'ollama':
             api_key_env = f'{provider.upper()}_API_KEY'
@@ -237,7 +237,7 @@ class TelegramPlugin(Plugin):
             channel_id = update.effective_chat.id if update.effective_chat else None
             channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
             provider = channel_settings.get('provider', 'ollama')
-            host = channel_settings.get('host') if provider == 'ollama' else None
+            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
             api_key = None
             if provider != 'ollama':
                 api_key_env = f'{provider.upper()}_API_KEY'

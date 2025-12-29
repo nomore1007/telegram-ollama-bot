@@ -246,7 +246,7 @@ class TelegramOllamaBot:
             channel_model = channel_settings.get('model', self.config.OLLAMA_MODEL)
             channel_prompt = channel_settings.get('prompt', self.custom_prompt)
             channel_provider = channel_settings.get('provider', 'ollama')
-            channel_host = channel_settings.get('host') if channel_provider == 'ollama' else None
+            channel_host = channel_settings.get('host', 'http://localhost:11434') if channel_provider == 'ollama' else None
 
             # Get API key for the provider
             api_key = None
