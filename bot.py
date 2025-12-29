@@ -236,7 +236,7 @@ class TelegramOllamaBot:
             if not message_text:
                 return
 
-            logger.info(f"Processing message: '{message_text[:50]}...' from chat {update.message.chat.id}")
+
 
             # SECURITY: Add message size limits
             MAX_MESSAGE_SIZE = 4096  # characters
@@ -259,7 +259,7 @@ class TelegramOllamaBot:
                 await update.message.reply_text(f"🚫 {validation_msg}")
                 return
 
-            logger.info("Security checks passed, processing message")
+
 
             chat_type = update.message.chat.type
             is_group_chat = chat_type in ["group", "supergroup"]
@@ -282,7 +282,6 @@ class TelegramOllamaBot:
 
             # Send thinking message
             thinking_message = await update.message.reply_text("🤔 Thinking…")
-            logger.info("Thinking message sent")
 
             # Check for YouTube URLs first (highest priority)
             youtube_urls = self.youtube_summarizer.extract_video_urls(message_text)
@@ -369,9 +368,7 @@ class TelegramOllamaBot:
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
             # Generate response with full context
-            logger.info(f"Generating response with {channel_provider} provider, model {channel_model}")
             response = await channel_llm.generate(context)
-            logger.info(f"Generated response: {len(response)} characters")
 
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)
