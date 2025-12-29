@@ -188,11 +188,12 @@ class TelegramPlugin(Plugin):
     async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
         if update.message:
-            channel_id = update.effective_chat.id if update.effective_chat else None
-            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+            channel_id = str(update.effective_chat.id) if update.effective_chat else None
+            current_model = self.bot.get_channel_setting(channel_id, 'model')
+            current_host = self.bot.get_channel_setting(channel_id, 'host')
             await update.message.reply_text(
                 f"🧠 Model: `{current_model}`\n"
-                f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
+                f"🌐 Host: `{current_host}`\n"
                 f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`",
                 parse_mode="Markdown",
             )
@@ -204,10 +205,9 @@ class TelegramPlugin(Plugin):
                 await update.message.reply_text("❌ Plugin not initialized properly")
             return
 
-        channel_id = update.effective_chat.id if update.effective_chat else None
-        channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-        provider = channel_settings.get('provider', 'ollama')
-        host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+        channel_id = str(update.effective_chat.id) if update.effective_chat else None
+        provider = self.bot.get_channel_setting(channel_id, 'provider')
+        host = self.bot.get_channel_setting(channel_id, 'host') if provider == 'ollama' else None
         api_key = None
         if provider != 'ollama':
             api_key_env = f'{provider.upper()}_API_KEY'
@@ -235,10 +235,9 @@ class TelegramPlugin(Plugin):
     async def handle_changemodel(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /changemodel command - show model selection menu"""
         if update.message:
-            channel_id = update.effective_chat.id if update.effective_chat else None
-            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-            provider = channel_settings.get('provider', 'ollama')
-            host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+            channel_id = str(update.effective_chat.id) if update.effective_chat else None
+            provider = self.bot.get_channel_setting(channel_id, 'provider')
+            host = self.bot.get_channel_setting(channel_id, 'host') if provider == 'ollama' else None
             api_key = None
             if provider != 'ollama':
                 api_key_env = f'{provider.upper()}_API_KEY'
@@ -267,7 +266,7 @@ class TelegramPlugin(Plugin):
             ]
             keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
 
-            current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
+            current_model = self.bot.get_channel_setting(channel_id, 'model')
             await update.message.reply_text(
                 f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
                 parse_mode="Markdown",
@@ -311,9 +310,9 @@ class TelegramPlugin(Plugin):
             return
 
         # Update the model for this channel
-        channel_id = update.effective_chat.id if update.effective_chat else None
+        channel_id = str(update.effective_chat.id) if update.effective_chat else None
         if channel_id:
-            self.bot.channel_settings.setdefault(channel_id, {})['model'] = requested_model
+            self.bot.save_channel_setting(channel_id, 'model', requested_model)
 
         if update.message:
             await update.message.reply_text(
@@ -331,7 +330,7 @@ class TelegramPlugin(Plugin):
             # Show available providers
             provider_list = "\n".join(f"• `{p}`" for p in supported_providers)
             channel_id = update.effective_chat.id if update.effective_chat else None
-            current_provider = self.bot.channel_settings.get(channel_id, {}).get('provider', 'ollama') if channel_id else 'ollama'
+            current_provider = self.bot.get_channel_setting(channel_id, 'provider')
             if update.message:
                 await update.message.reply_text(
                     f"🤖 Available providers:\n{provider_list}\n\n"
@@ -352,15 +351,14 @@ class TelegramPlugin(Plugin):
             return
 
         # Update the provider for this channel
-        channel_id = update.effective_chat.id if update.effective_chat else None
+        channel_id = str(update.effective_chat.id) if update.effective_chat else None
         if channel_id:
-            self.bot.channel_settings.setdefault(channel_id, {})['provider'] = provider
+            self.bot.save_channel_setting(channel_id, 'provider', provider)
 
             # If ollama and host provided
-            host = None
             if provider == 'ollama' and len(context.args) > 1:
                 host = context.args[1]
-                self.bot.channel_settings[channel_id]['host'] = host
+                self.bot.save_channel_setting(channel_id, 'host', host)
 
             reply = f"✅ Provider set to: `{provider}`"
             if host:
@@ -448,9 +446,9 @@ class TelegramPlugin(Plugin):
                 raise ValueError("Prompt too long (max 1000 characters)")
 
             # Update the prompt for this channel
-            channel_id = update.effective_chat.id if update.effective_chat else None
+            channel_id = str(update.effective_chat.id) if update.effective_chat else None
             if channel_id:
-                self.bot.channel_settings.setdefault(channel_id, {})['prompt'] = new_prompt
+                self.bot.save_channel_setting(channel_id, 'prompt', new_prompt)
 
             if update.message:
                 preview = new_prompt[:100] + "..." if len(new_prompt) > 100 else new_prompt
@@ -487,8 +485,8 @@ class TelegramPlugin(Plugin):
             back_button = InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
 
             if action == "model_info":
-                channel_id = query.message.chat.id if query.message and query.message.chat else None
-                current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+                channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
+                current_model = self.bot.get_channel_setting(channel_id, 'model')
                 text = (
                     f"🧠 *Model Information*\n\n"
                     f"🤖 Model: `{current_model}`\n"
@@ -498,10 +496,9 @@ class TelegramPlugin(Plugin):
                 await query.edit_message_text(text, parse_mode="Markdown", reply_markup=back_button)
 
             elif action == "list_models":
-                channel_id = query.message.chat.id if query.message and query.message.chat else None
-                channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-                provider = channel_settings.get('provider', 'ollama')
-                host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+                channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
+                provider = self.bot.get_channel_setting(channel_id, 'provider')
+                host = self.bot.get_channel_setting(channel_id, 'host') if provider == 'ollama' else None
                 api_key = None
                 if provider != 'ollama':
                     api_key_env = f'{provider.upper()}_API_KEY'
@@ -523,10 +520,9 @@ class TelegramPlugin(Plugin):
                 await query.edit_message_text(f"🤖 Available models for {provider}:\n{text}", reply_markup=back_button)
 
             elif action == "change_model":
-                channel_id = query.message.chat.id if query.message and query.message.chat else None
-                channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
-                provider = channel_settings.get('provider', 'ollama')
-                host = channel_settings.get('host', 'http://localhost:11434') if provider == 'ollama' else None
+                channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
+                provider = self.bot.get_channel_setting(channel_id, 'provider')
+                host = self.bot.get_channel_setting(channel_id, 'host') if provider == 'ollama' else None
                 api_key = None
                 if provider != 'ollama':
                     api_key_env = f'{provider.upper()}_API_KEY'
@@ -555,7 +551,7 @@ class TelegramPlugin(Plugin):
                 ]
                 keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="show_menu")])
 
-                current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
+                current_model = self.bot.get_channel_setting(channel_id, 'model')
                 await query.edit_message_text(
                     f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
                     parse_mode="Markdown",
@@ -676,9 +672,9 @@ class TelegramPlugin(Plugin):
             logger.info(f"Selected model: {model_name}")
 
             # Update the model for this channel
-            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
             if channel_id:
-                self.bot.channel_settings.setdefault(channel_id, {})['model'] = model_name
+                self.bot.save_channel_setting(channel_id, 'model', model_name)
 
             await query.edit_message_text(
                 f"✅ Model updated to:\n`{model_name}`\n\n*For this channel*",
@@ -711,8 +707,8 @@ class TelegramPlugin(Plugin):
     async def _show_model_info(self, query):
         """Show model info in query context"""
         # Assume query from the same chat
-        channel_id = query.message.chat.id if query.message and query.message.chat else None
-        current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+        channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
+        current_model = self.bot.get_channel_setting(channel_id, 'model')
         text = (
             f"🧠 *Model Information*\n\n"
             f"🤖 Model: `{current_model}`\n"
@@ -761,8 +757,8 @@ class TelegramPlugin(Plugin):
 
         if query:
             # Assume query from the same chat
-            channel_id = query.message.chat.id if query.message and query.message.chat else None
-            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
+            channel_id = str(query.message.chat.id) if query.message and query.message.chat else None
+            current_model = self.bot.get_channel_setting(channel_id, 'model')
             await query.edit_message_text(
                 f"🤖 *Select a Model*\n\n(Current: `{current_model}`)",
                 parse_mode="Markdown",

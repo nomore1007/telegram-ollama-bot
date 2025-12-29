@@ -33,6 +33,7 @@ from plugins import plugin_manager
 from plugins.telegram_plugin import TelegramPlugin
 from plugins.web_search_plugin import WebSearchPlugin
 from plugins.discord_plugin import DiscordPlugin
+from database import ChannelSettings
 
 
 # -------------------------------------------------------------------
@@ -82,7 +83,14 @@ class TelegramOllamaBot:
         self.custom_prompt = getattr(config, 'DEFAULT_PROMPT', "You are a helpful AI assistant.")
         self.bot_username = None
         self.admin_manager = AdminManager(getattr(config, 'ADMIN_USER_IDS', []))
-        self.channel_settings = {}  # Per-channel settings for model and prompt
+        self.channel_settings = {}  # In-memory cache for per-channel settings
+
+        # Initialize database
+        self._init_database()
+
+        # Load persisted channel settings
+        self._load_channel_settings()
+
         personality_name = getattr(config, 'DEFAULT_PERSONALITY', 'helpful')
         try:
             self.personality = Personality(personality_name)
@@ -95,6 +103,86 @@ class TelegramOllamaBot:
 
         # Legacy handlers for backward compatibility
         self.handlers = TelegramHandlers(self)
+
+    def _init_database(self):
+        """Initialize database connection and create tables."""
+        from database import Base
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Use SQLite for simplicity - can be changed to PostgreSQL/MySQL later
+        database_url = getattr(self.config, 'DATABASE_URL', 'sqlite:///deepthought_bot.db')
+        self.db_engine = create_engine(database_url, echo=False)
+        self.db_session = sessionmaker(bind=self.db_engine)
+
+        # Create tables
+        Base.metadata.create_all(self.db_engine)
+        logger.info("Database initialized")
+
+    def _load_channel_settings(self):
+        """Load channel settings from database."""
+        session = self.db_session()
+        try:
+            settings = session.query(ChannelSettings).all()
+            for setting in settings:
+                self.channel_settings[setting.channel_id] = {
+                    'provider': setting.provider,
+                    'model': setting.model,
+                    'host': setting.host,
+                    'prompt': setting.prompt
+                }
+            logger.info(f"Loaded {len(settings)} channel settings from database")
+        except Exception as e:
+            logger.error(f"Error loading channel settings: {e}")
+        finally:
+            session.close()
+
+    def save_channel_setting(self, channel_id: str, key: str, value):
+        """Save a channel setting to database and memory cache."""
+        session = self.db_session()
+        try:
+            # Get or create channel settings record
+            channel_setting = session.query(ChannelSettings).filter_by(channel_id=channel_id).first()
+            if not channel_setting:
+                channel_setting = ChannelSettings(channel_id=channel_id)
+                session.add(channel_setting)
+
+            # Update the setting
+            setattr(channel_setting, key, value)
+            session.commit()
+
+            # Update in-memory cache
+            if channel_id not in self.channel_settings:
+                self.channel_settings[channel_id] = {}
+            self.channel_settings[channel_id][key] = value
+
+            logger.debug(f"Saved channel setting {channel_id}.{key} = {value}")
+
+        except Exception as e:
+            logger.error(f"Error saving channel setting: {e}")
+            session.rollback()
+        finally:
+            session.close()
+
+    def get_channel_setting(self, channel_id: str, key: str, default=None):
+        """Get a channel setting, falling back to global default if not set."""
+        channel_settings = self.channel_settings.get(channel_id, {})
+
+        # If channel has the setting, return it
+        if key in channel_settings and channel_settings[key] is not None:
+            return channel_settings[key]
+
+        # Otherwise return global default
+        if key == 'provider':
+            return 'ollama'
+        elif key == 'model':
+            return self.config.OLLAMA_MODEL
+        elif key == 'host':
+            return self.config.OLLAMA_HOST
+        elif key == 'prompt':
+            return self.custom_prompt
+
+        return default
 
     def _load_plugins(self):
         """Load and initialize plugins."""

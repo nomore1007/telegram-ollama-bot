@@ -125,6 +125,22 @@ class UsageStats(Base):
     def __repr__(self):
         return f"<UsageStats(user_id={self.user_id}, action={self.action}, value={self.value})>"
 
+class ChannelSettings(Base):
+    """Per-channel settings for model, provider, and prompt configuration"""
+    __tablename__ = 'channel_settings'
+
+    id = Column(Integer, primary_key=True)
+    channel_id = Column(String(50), unique=True, nullable=False, index=True)  # Telegram chat ID
+    provider = Column(String(50), default='ollama')  # ollama, openai, groq, etc.
+    model = Column(String(100))  # Model name
+    host = Column(String(200))  # Custom host for ollama
+    prompt = Column(Text)  # Custom system prompt
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ChannelSettings(channel_id={self.channel_id}, provider={self.provider}, model={self.model})>"
+
 # Database connection and session management
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///telegram_bot.db')
 
