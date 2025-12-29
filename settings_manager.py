@@ -126,13 +126,21 @@ class SettingsManager:
 
     def _validate_required_settings(self):
         """Validate that required settings are present."""
-        required_settings = ['TELEGRAM_BOT_TOKEN']
-
         missing = []
-        for setting in required_settings:
-            value = self.settings.get(setting)
-            if value is None or (isinstance(value, str) and value.startswith('YOUR_') and value.endswith('_HERE')):
-                missing.append(setting)
+
+        # Check for Telegram bot token if telegram plugin is enabled
+        enabled_plugins = self.settings.get('ENABLED_PLUGINS', [])
+        if 'telegram' in enabled_plugins:
+            plugins = self.settings.get('PLUGINS', {})
+            telegram_config = plugins.get('telegram', {})
+            bot_token = telegram_config.get('bot_token')
+            if not bot_token or (isinstance(bot_token, str) and bot_token.startswith('YOUR_') and bot_token.endswith('_HERE')):
+                missing.append('TELEGRAM_BOT_TOKEN (in PLUGINS["telegram"]["bot_token"])')
+
+        # Check for Ollama host (still global)
+        ollama_host = self.settings.get('OLLAMA_HOST')
+        if not ollama_host:
+            missing.append('OLLAMA_HOST')
 
         if missing:
             raise ValueError(
