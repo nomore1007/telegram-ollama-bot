@@ -97,12 +97,13 @@ class TelegramOllamaBot:
 
     def _load_plugins(self):
         """Load and initialize plugins."""
-        enabled_plugins = getattr(self.config, 'ENABLED_PLUGINS', ['telegram', 'web_search'])
+        enabled_plugins = getattr(self.config, 'ENABLED_PLUGINS', [])
 
-        # Load available plugins
-        plugin_manager.load_plugin("telegram", TelegramPlugin, {})
-        plugin_manager.load_plugin("web_search", WebSearchPlugin, {})
-        plugin_manager.load_plugin("discord", DiscordPlugin, {})
+        # Load available plugins with their configs
+        plugin_configs = getattr(self.config, 'PLUGINS', {})
+        plugin_manager.load_plugin("telegram", TelegramPlugin, plugin_configs.get('telegram', {}))
+        plugin_manager.load_plugin("web_search", WebSearchPlugin, plugin_configs.get('web_search', {}))
+        plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
 
         # Enable configured plugins
         for plugin_name in enabled_plugins:
@@ -256,7 +257,11 @@ class TelegramOllamaBot:
         """
         Runs the bot.
         """
-        app_builder = Application.builder().token(self.config.TELEGRAM_BOT_TOKEN)
+        telegram_config = self.config.PLUGINS.get('telegram', {})
+        bot_token = telegram_config.get('bot_token')
+        if not bot_token:
+            raise ValueError("Telegram bot token not configured in PLUGINS['telegram']['bot_token']")
+        app_builder = Application.builder().token(bot_token)
         app_builder.post_init(self.post_init)
         app = app_builder.build()
 
@@ -293,7 +298,8 @@ class TelegramOllamaBot:
         """Run Discord bot if enabled."""
         discord_plugin = plugin_manager.plugins.get("discord")
         if discord_plugin and plugin_manager.plugins["discord"] in plugin_manager.get_enabled_plugins():
-            discord_token = getattr(self.config, 'DISCORD_BOT_TOKEN', None)
+            discord_config = self.config.PLUGINS.get('discord', {})
+            discord_token = discord_config.get('bot_token')
             if discord_token:
                 logger.info("Starting Discord bot")
                 discord_plugin.run_discord_bot(discord_token)

@@ -13,11 +13,7 @@ from typing import Optional
 # REQUIRED SETTINGS (MUST BE CONFIGURED)
 # ===========================================
 
-# Telegram Bot Token (get from @BotFather)
-# Example: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
-
-# Ollama server configuration (if using Ollama)
+# Ollama server configuration (if using Ollama) - Global LLM settings
 OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama2")
 
@@ -44,7 +40,8 @@ DEFAULT_PROMPT: str = os.getenv(
 # ===========================================
 
 # Enabled plugins (comma-separated list)
-ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "telegram,web_search,discord").split(",")
+# Only enable plugins that you have configured in PLUGINS dict
+ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "").split(",") if os.getenv("ENABLED_PLUGINS") else []
 
 # ===========================================
 # ADMIN CONFIGURATION
@@ -89,6 +86,25 @@ HUGGINGFACE_API_KEY: Optional[str] = os.getenv("HUGGINGFACE_API_KEY")
 ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
 # ===========================================
+# PLUGIN CONFIGURATIONS
+# ===========================================
+
+# Plugin-specific settings
+PLUGINS: dict = {
+    'telegram': {
+        'bot_token': os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE"),
+        # Add other telegram-specific settings here
+    },
+    'discord': {
+        'bot_token': os.getenv("DISCORD_BOT_TOKEN"),
+        # Add other discord-specific settings here
+    },
+    'web_search': {
+        # Web search specific settings
+    }
+}
+
+# ===========================================
 # SETUP INSTRUCTIONS
 # ===========================================
 #
@@ -96,7 +112,7 @@ ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 #    cp settings.example.py settings.py
 #
 # 2. Edit settings.py with your actual values:
-#    - Set TELEGRAM_BOT_TOKEN (required)
+#    - Configure PLUGINS dict with your bot tokens and plugin settings
 #    - Configure OLLAMA_HOST if using Ollama
 #    - Add API keys for cloud providers if needed
 #    - Set other options as desired
