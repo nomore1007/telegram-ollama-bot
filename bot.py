@@ -33,6 +33,13 @@ from conversation import ConversationManager
 from security import InputValidator, RateLimiter
 from admin import AdminManager
 from personality import Personality, personality_manager
+# -------------------------------------------------------------------
+# Logging setup (early for safe imports)
+# -------------------------------------------------------------------
+
+import logging
+logger = logging.getLogger(__name__)
+
 from plugins import plugin_manager
 
 # Import plugins with graceful error handling
@@ -71,7 +78,6 @@ logging.basicConfig(
     format=LOG_FORMAT,
     level=getattr(logging, LOG_LEVEL),
 )
-logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------------------
