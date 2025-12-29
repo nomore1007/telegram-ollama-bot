@@ -521,6 +521,7 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("Show Info", callback_data="model_info")],
                 [InlineKeyboardButton("List Models", callback_data="listmodels")],
                 [InlineKeyboardButton("Change Model", callback_data="changemodel")],
+                [InlineKeyboardButton("Set Ollama Host", callback_data="set_ollama_host")],
                 [InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")],
             ]
             await query.edit_message_text(
@@ -534,6 +535,16 @@ class TelegramPlugin(Plugin):
             await self._show_model_selection(query, context)
         elif action == "model_info":
             await self._show_model_info(query)
+        elif action == "set_ollama_host":
+            await query.edit_message_text(
+                "🌐 *Set Ollama Host*\n\n"
+                "Use the command:\n`/setprovider ollama <host>`\n\n"
+                "Example:\n`/setprovider ollama http://localhost:11434`\n"
+                "Or for remote:\n`/setprovider ollama http://remote-server:11434`\n\n"
+                "This sets the Ollama host for this channel.",
+                parse_mode="Markdown",
+                reply_markup=back_button
+            )
         elif action == "timeout":
             await query.edit_message_text(
                 "⏱️ *Set Timeout*\n\n"
