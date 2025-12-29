@@ -469,6 +469,17 @@ class TelegramOllamaBot:
 
         # Legacy callback handlers removed - using plugin system
 
+        # Debug handler for all messages
+        async def debug_message_handler(update, context):
+            if update.message:
+                print(f"🔍 MESSAGE RECEIVED: {update.message.text}")
+            elif update.callback_query:
+                print(f"🔍 CALLBACK RECEIVED: {update.callback_query.data}")
+            else:
+                print(f"🔍 UNKNOWN UPDATE: {type(update)}")
+
+        app.add_handler(MessageHandler(filters.ALL, debug_message_handler), group=1000)
+
         # Message handler for general messages
         app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)

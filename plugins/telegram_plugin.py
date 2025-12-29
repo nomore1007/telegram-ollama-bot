@@ -115,31 +115,23 @@ class TelegramPlugin(Plugin):
 
     async def handle_start(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
-        assert self.bot is not None, "Plugin not initialized"
         if update.message:
+            print("🔍 SENDING START MENU")
+            keyboard = [
+                [InlineKeyboardButton("💬 Chat", callback_data="chat")],
+                [InlineKeyboardButton("📰 News Summarizer", callback_data="news")],
+                [InlineKeyboardButton("🎬 YouTube Summarizer", callback_data="youtube")],
+                [InlineKeyboardButton("⚙️ Model Settings", callback_data="model")],
+                [InlineKeyboardButton("❓ Help", callback_data="help")],
+            ]
+            print(f"🔍 START KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
             await update.message.reply_text(
-                "🌟 *Welcome to Deepthought Bot!* 🤖\n\n"
-                "I'm your advanced AI assistant with multi-provider support, "
-                "personality modes, and real-time web search capabilities.\n\n"
-                "🚀 *Quick Start:*\n"
-                "• Just type any message to start chatting!\n"
-                "• Use `/search <query>` for web information\n"
-                "• Try `/personality` to customize my behavior\n\n"
-                "📚 *Key Features:*\n"
-                "🔍 *Web Search* - Real-time information retrieval\n"
-                "🎭 *6 Personalities* - Adapt my communication style\n"
-                "📰 *Auto-Summarization* - News articles and YouTube videos\n"
-                "⚙️ *Multi-Provider* - Ollama, OpenAI, Groq, and more\n"
-                "👑 *Admin Controls* - Secure configuration management\n\n"
-                "📖 *Get Started:*\n"
-                "`/help` - Complete command guide\n"
-                "`/menu` - Interactive feature menu\n"
-                "`/userid` - Get your user ID for admin setup\n\n"
-                f"🧠 Current: {self.bot.llm.provider_name} | {self.bot.llm.model}\n"
-                f"🎭 Personality: {self.bot.personality.value}\n"
-                f"⏱️ Timeout: {self.bot.llm.provider.timeout}s",
+                f"🤖 *Welcome to {self.bot.bot_username or 'Deepthought Bot'}!*\n\n"
+                "Choose an option below:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
+            print("🔍 START MENU SENT")
 
     async def handle_help(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
@@ -169,8 +161,9 @@ class TelegramPlugin(Plugin):
             )
 
     async def handle_menu(self, update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /menu command"""
+        """Handle /menu command - show model management menu"""
         if update.message:
+            print("🔍 SENDING MODEL MENU")
             keyboard = [
                 [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
                 [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
@@ -179,11 +172,13 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
                 [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
             ]
+            print(f"🔍 MENU KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
             await update.message.reply_text(
                 "🤖 *Bot Menu*\n\nChoose an option:",
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
+            print("🔍 MODEL MENU SENT")
 
     async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
