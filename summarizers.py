@@ -669,36 +669,46 @@ class YouTubeSummarizer:
     async def get_transcript(self, video_id: str) -> dict:
         """Get transcript for YouTube video"""
         try:
-            # Try to get transcript in multiple languages
-            transcript_list = await asyncio.to_thread(YouTubeTranscriptApi.list_transcripts, video_id)
+            # Try multiple transcript retrieval methods
+            transcript_data = None
 
-            # Try English first, then any available language
-            transcript = None
-            languages = ['en', 'en-US', 'en-GB']
-
-            for lang in languages:
+            # Method 1: Try direct get_transcript (most reliable)
+            try:
+                transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
+            except Exception:
                 try:
-                    transcript = await asyncio.to_thread(transcript_list.find_transcript, [lang])
-                    break
-                except:
-                    continue
+                    # Try without language specification
+                    transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
+                except Exception:
+                    pass
 
-            # If no English transcript, get any manually created transcript
-            if not transcript:
+            # Method 2: Try list_transcripts approach if direct method failed
+            if not transcript_data:
                 try:
-                    transcript = await asyncio.to_thread(transcript_list.find_manually_created_transcript)
-                except:
-                    # Fall back to any available transcript
+                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
+                    # Try English first
                     try:
-                        transcript = await asyncio.to_thread(list(transcript_list).__getitem__, 0)
-                    except:
-                        pass
+                        transcript = transcript_list.find_transcript(['en'])
+                        transcript_data = transcript.fetch()
+                    except Exception:
+                        # Try manually created transcripts
+                        try:
+                            transcript = transcript_list.find_manually_created_transcript()
+                            transcript_data = transcript.fetch()
+                        except Exception:
+                            # Try any available transcript
+                            try:
+                                transcripts = list(transcript_list)
+                                if transcripts:
+                                    transcript_data = transcripts[0].fetch()
+                            except Exception:
+                                pass
+                except Exception as e:
+                    logger.warning(f"Transcript list API failed: {type(e).__name__}")
 
-            if not transcript:
-                return {"success": False, "error": "No transcript available"}
-
-            # Fetch transcript data
-            transcript_data = await asyncio.to_thread(transcript.fetch)
+            if not transcript_data:
+                return {"success": False, "error": "No transcript available for this video"}
 
             # Combine transcript text
             full_text = " ".join([entry['text'] for entry in transcript_data])
@@ -706,9 +716,9 @@ class YouTubeSummarizer:
             return {
                 "success": True,
                 "text": full_text,
-                "language": transcript.language,
-                "is_generated": transcript.is_generated,
-                "duration": sum([entry['duration'] for entry in transcript_data])
+                "language": "en",
+                "is_generated": False,
+                "duration": sum([entry.get('duration', 0) for entry in transcript_data])
             }
 
         except (TranscriptsDisabled, NoTranscriptFound) as e:
