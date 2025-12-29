@@ -35,6 +35,7 @@ class TelegramPlugin(Plugin):
 
     def __init__(self, name: str, config: Optional[dict] = None):
         super().__init__(name, config)
+        self.bot = None
         logger.info("Telegram plugin initialized")
 
     def initialize(self, bot_instance) -> None:
@@ -192,7 +193,7 @@ class TelegramPlugin(Plugin):
 
     async def handle_listmodels(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listmodels command"""
-        print(f"DEBUG: handle_listmodels called, bot_instance: {self.bot}")
+        print(f"DEBUG: handle_listmodels called, bot: {self.bot}")
         if self.bot is None:
             if update.message:
                 await update.message.reply_text("❌ Plugin not initialized properly")
