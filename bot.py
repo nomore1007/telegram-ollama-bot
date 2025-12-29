@@ -340,12 +340,12 @@ class TelegramOllamaBot:
             chat_id = update.message.chat.id
             self.conversation_manager.add_user_message(chat_id, message_text)
 
-            # Get per-channel settings
-            channel_settings = self.channel_settings.get(chat_id, {})
-            channel_model = channel_settings.get('model', self.config.OLLAMA_MODEL)
-            channel_prompt = channel_settings.get('prompt', self.custom_prompt)
-            channel_provider = channel_settings.get('provider', 'ollama')
-            channel_host = channel_settings.get('host', self.config.OLLAMA_HOST) if channel_provider == 'ollama' else None
+            # Get per-channel settings using the same method as other commands
+            channel_id_str = str(chat_id)
+            channel_model = self.get_channel_setting(channel_id_str, 'model')
+            channel_prompt = self.get_channel_setting(channel_id_str, 'prompt') or self.custom_prompt
+            channel_provider = self.get_channel_setting(channel_id_str, 'provider')
+            channel_host = self.get_channel_setting(channel_id_str, 'host') if channel_provider == 'ollama' else None
 
             # Debug logging
             logger.info(f"Channel settings for {chat_id}: provider={channel_provider}, model={channel_model}, host={channel_host}")
