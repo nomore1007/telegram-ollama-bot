@@ -18,6 +18,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     CallbackContext,
+    TypeHandler,
     filters,
 )
 from constants import (
@@ -465,9 +466,12 @@ class TelegramOllamaBot:
                 print(f"🔍 TRACEBACK: {traceback.format_exc()}")
 
             print("🔍 DEBUG: Callback handlers registered with Telegram app")
-            print(f"🔍 DEBUG: App has {len(app.handlers)} handler groups")
-            total_handlers = sum(len(group) for group in app.handlers)
-            print(f"🔍 DEBUG: Total handlers across all groups: {total_handlers}")
+            print(f"🔍 DEBUG: App handlers structure: {type(app.handlers)}")
+            try:
+                handler_count = len(app.handlers) if hasattr(app.handlers, '__len__') else 'unknown'
+                print(f"🔍 DEBUG: App has {handler_count} handler groups")
+            except:
+                print("🔍 DEBUG: Could not count handler groups")
             logger.info("Callback handlers registered")
 
             # Add a catch-all callback handler for debugging
@@ -484,16 +488,17 @@ class TelegramOllamaBot:
 
         # Legacy callback handlers removed - using plugin system
 
-        # Debug handler for all messages
-        async def debug_message_handler(update, context):
-            if update.message:
-                print(f"🔍 MESSAGE RECEIVED: {update.message.text}")
-            elif update.callback_query:
-                print(f"🔍 CALLBACK RECEIVED: {update.callback_query.data}")
-            else:
-                print(f"🔍 UNKNOWN UPDATE: {type(update)}")
+        # Debug handler for all updates (highest priority)
+        async def debug_update_handler(update, context):
+            print(f"🔍 UPDATE RECEIVED: {type(update).__name__}")
+            if hasattr(update, 'message') and update.message:
+                print(f"🔍 MESSAGE: {update.message.text if hasattr(update.message, 'text') else 'NO TEXT'}")
+            if hasattr(update, 'callback_query') and update.callback_query:
+                print(f"🔍 CALLBACK QUERY: {update.callback_query.data}")
+                print(f"🔍 CALLBACK ID: {update.callback_query.id}")
+            return False  # Don't consume the update
 
-        app.add_handler(MessageHandler(filters.ALL, debug_message_handler), group=1000)
+        app.add_handler(TypeHandler(object, debug_update_handler), group=0)  # Highest priority
 
         # Message handler for general messages
         app.add_handler(

@@ -171,6 +171,7 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
                 [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
                 [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                [InlineKeyboardButton("🔍 TEST BUTTON", callback_data="test_callback")],  # Simple test button
             ]
             print(f"🔍 MENU KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
 
@@ -639,6 +640,9 @@ class TelegramPlugin(Plugin):
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode="Markdown"
                 )
+
+            elif action == "test_callback":
+                await query.edit_message_text("✅ Test button works! Callbacks are functioning.", reply_markup=back_button)
 
             else:
                 await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
