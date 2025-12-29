@@ -76,10 +76,30 @@ class NewsSummarizer:
             error_type = type(e).__name__
             logger.error(f"Error extracting article from {url}: {error_type}")
 
+            # Check if this is a paywall/access issue - try archive.is fallback
+            is_access_blocked = (
+                "403" in str(e) or
+                "forbidden" in str(e).lower() or
+                "paywall" in str(e).lower() or
+                "subscription" in str(e).lower()
+            )
+
+            if is_access_blocked:
+                logger.info(f"Trying archive.is fallback for {url}")
+                try:
+                    archive_result = await self._extract_from_archive(url)
+                    if archive_result["success"]:
+                        logger.info(f"Successfully extracted article from archive.is for {url}")
+                        return archive_result
+                    else:
+                        logger.warning(f"Archive.is fallback also failed for {url}")
+                except Exception as archive_e:
+                    logger.error(f"Archive.is fallback failed for {url}: {type(archive_e).__name__}")
+
             # Provide more user-friendly error messages
             if "timeout" in str(e).lower() or error_type == "TimeoutError":
                 error_msg = "Article took too long to load"
-            elif "403" in str(e) or "forbidden" in str(e).lower():
+            elif is_access_blocked:
                 error_msg = "Article access blocked (possibly paywall or region restriction)"
             elif "404" in str(e) or "not found" in str(e).lower():
                 error_msg = "Article not found"
@@ -90,10 +110,48 @@ class NewsSummarizer:
 
             return {"success": False, "error": error_msg}
 
+    async def _extract_from_archive(self, url: str) -> dict:
+        """Try to extract article from archive.is as fallback for blocked content"""
+        try:
+            # Create archive.is URL
+            archive_url = f"https://archive.is/{url}"
+
+            # Try to extract from archived version
+            article = Article(archive_url)
+
+            # Use asyncio.wait_for to add timeout
+            await asyncio.wait_for(
+                asyncio.to_thread(article.download),
+                timeout=45.0  # Longer timeout for archive
+            )
+            await asyncio.wait_for(
+                asyncio.to_thread(article.parse),
+                timeout=20.0  # Longer timeout for parsing
+            )
+
+            if not article.title or not article.text:
+                return {"success": False, "error": "Could not extract archived article content"}
+
+            return {
+                "success": True,
+                "title": f"[Archived] {article.title}",
+                "text": article.text,
+                "url": archive_url,  # Use archive URL
+                "authors": article.authors,
+                "publish_date": article.publish_date,
+                "summary": article.summary if hasattr(article, 'summary') else None,
+                "source": "archive.is"
+            }
+
+        except Exception as e:
+            logger.error(f"Error extracting from archive.is for {url}: {type(e).__name__}")
+            return {"success": False, "error": f"Archive extraction failed: {type(e).__name__}"}
+
     async def summarize_with_ai(self, article_data: dict) -> str:
         """Use AI to summarize the article"""
         if not article_data["success"]:
-            return "❌ Could not extract article content."
+            error_msg = article_data.get("error", "Could not extract article content")
+            return f"❌ {error_msg}"
 
         title = article_data["title"]
         text = article_data["text"]
@@ -144,10 +202,19 @@ Keep it informative but concise."""
         authors = ", ".join(article_data["authors"]) if article_data["authors"] else "Unknown"
         publish_date = article_data["publish_date"].strftime("%Y-%m-%d") if article_data["publish_date"] else "Unknown"
 
+        # Check if this came from archive
+        source_indicator = ""
+        source_url = url
+        if article_data.get("source") == "archive.is":
+            source_indicator = "📚 *Archived Content* (accessed via archive.is)\n"
+            source_url = article_data.get("url", url)
+
         response = f"📰 *{title}*\n\n"
+        if source_indicator:
+            response += f"{source_indicator}\n"
         response += f"👤 *Authors:* {authors}\n"
         response += f"📅 *Published:* {publish_date}\n"
-        response += f"🔗 *Source:* [Read More]({url})\n\n"
+        response += f"🔗 *Source:* [Read More]({source_url})\n\n"
         response += "📋 *Summary:*\n"
         response += summary
 
