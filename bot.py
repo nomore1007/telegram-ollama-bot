@@ -347,6 +347,11 @@ class TelegramOllamaBot:
             channel_provider = channel_settings.get('provider', 'ollama')
             channel_host = channel_settings.get('host', self.config.OLLAMA_HOST) if channel_provider == 'ollama' else None
 
+            # Debug logging
+            logger.info(f"Channel settings for {chat_id}: provider={channel_provider}, model={channel_model}, host={channel_host}")
+            logger.info(f"Global config: OLLAMA_HOST={self.config.OLLAMA_HOST}, OLLAMA_MODEL={self.config.OLLAMA_MODEL}")
+            logger.info(f"Environment OLLAMA_HOST: {os.getenv('OLLAMA_HOST', 'NOT_SET')}")
+
             # Get API key for the provider
             api_key = None
             if channel_provider != 'ollama':
