@@ -45,7 +45,7 @@ class TelegramPlugin(Plugin):
     def get_commands(self) -> List[str]:
         """Return list of commands this plugin handles."""
         return [
-            "start", "help", "menu", "model", "listmodels", "changemodel",
+            "start", "help", "menu", "model", "listmodels", "setmodel", "changemodel",
             "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
             "personality", "setpersonality", "clear"
         ]
@@ -184,8 +184,10 @@ class TelegramPlugin(Plugin):
     async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
         if update.message:
+            channel_id = update.effective_chat.id if update.effective_chat else None
+            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
             await update.message.reply_text(
-                f"🧠 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
+                f"🧠 Model: `{current_model}`\n"
                 f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
                 f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`",
                 parse_mode="Markdown",
@@ -217,7 +219,29 @@ class TelegramPlugin(Plugin):
 
     @require_admin
     async def handle_changemodel(self, update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /changemodel command"""
+        """Handle /changemodel command - show model selection menu"""
+        if update.message:
+            models = await self.bot.llm.list_models()
+            if not models:
+                await update.message.reply_text("❌ No models available.")
+                return
+
+            # Use index-based callback data to avoid length limits
+            keyboard = [
+                [InlineKeyboardButton(m, callback_data=f"changemodel:{idx}")]
+                for idx, m in enumerate(models)
+            ]
+            keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
+
+            await update.message.reply_text(
+                f"🤖 *Select a Model*\n\n(Current: `{self.bot.config.OLLAMA_MODEL}`)",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+    @require_admin
+    async def handle_setmodel(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setmodel command"""
         if not context.args or len(context.args) == 0:
             # Show available models if no argument provided
             models = await self.bot.llm.list_models()
@@ -251,14 +275,15 @@ class TelegramPlugin(Plugin):
                 )
             return
 
-        # Update the model
-        self.bot.config.OLLAMA_MODEL = requested_model
-        self.bot.llm.set_model(requested_model)
+        # Update the model for this channel
+        channel_id = update.effective_chat.id if update.effective_chat else None
+        if channel_id:
+            self.bot.channel_settings.setdefault(channel_id, {})['model'] = requested_model
 
         if update.message:
             await update.message.reply_text(
                 f"✅ Model changed to: `{requested_model}`\n\n"
-                f"🧠 The bot will now use this model for AI responses.",
+                f"🧠 The bot will now use this model for AI responses in this channel.",
                 parse_mode="Markdown"
             )
 
@@ -309,12 +334,15 @@ class TelegramPlugin(Plugin):
             if len(new_prompt) > 1000:
                 raise ValueError("Prompt too long (max 1000 characters)")
 
-            self.bot.custom_prompt = new_prompt
+            # Update the prompt for this channel
+            channel_id = update.effective_chat.id if update.effective_chat else None
+            if channel_id:
+                self.bot.channel_settings.setdefault(channel_id, {})['prompt'] = new_prompt
 
             if update.message:
                 preview = new_prompt[:100] + "..." if len(new_prompt) > 100 else new_prompt
                 await update.message.reply_text(
-                    f"✅ *Prompt Updated!*\n\n"
+                    f"✅ *Prompt Updated for this channel!*\n\n"
                     f"📝 *New prompt:*\n`{preview}`",
                     parse_mode="Markdown"
                 )
@@ -446,11 +474,13 @@ class TelegramPlugin(Plugin):
             model_name = model_list[model_idx]
             logger.info(f"Selected model: {model_name}")
 
-            self.bot.config.OLLAMA_MODEL = model_name
-            self.bot.llm.set_model(model_name)
+            # Update the model for this channel
+            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            if channel_id:
+                self.bot.channel_settings.setdefault(channel_id, {})['model'] = model_name
 
             await query.edit_message_text(
-                f"✅ Model updated to:\n`{model_name}`",
+                f"✅ Model updated to:\n`{model_name}`\n\n*For this channel*",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]])
             )
@@ -479,9 +509,12 @@ class TelegramPlugin(Plugin):
 
     async def _show_model_info(self, query):
         """Show model info in query context"""
+        # Assume query from the same chat
+        channel_id = query.message.chat.id if query.message and query.message.chat else None
+        current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
         text = (
             f"🧠 *Model Information*\n\n"
-            f"🤖 Model: `{self.bot.config.OLLAMA_MODEL}`\n"
+            f"🤖 Model: `{current_model}`\n"
             f"🌐 Host: `{self.bot.config.OLLAMA_HOST}`\n"
             f"⏱ Timeout: `{self.bot.config.TIMEOUT}s`"
         )
@@ -526,8 +559,11 @@ class TelegramPlugin(Plugin):
         keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
 
         if query:
+            # Assume query from the same chat
+            channel_id = query.message.chat.id if query.message and query.message.chat else None
+            current_model = self.bot.channel_settings.get(channel_id, {}).get('model', self.bot.config.OLLAMA_MODEL) if channel_id else self.bot.config.OLLAMA_MODEL
             await query.edit_message_text(
-                f"🤖 *Select a Model*\n\n(Current: `{self.bot.config.OLLAMA_MODEL}`)",
+                f"🤖 *Select a Model*\n\n(Current: `{current_model}`)",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )

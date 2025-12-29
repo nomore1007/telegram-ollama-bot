@@ -82,6 +82,7 @@ class TelegramOllamaBot:
         self.custom_prompt = getattr(config, 'DEFAULT_PROMPT', "You are a helpful AI assistant.")
         self.bot_username = None
         self.admin_manager = AdminManager(getattr(config, 'ADMIN_USER_IDS', []))
+        self.channel_settings = {}  # Per-channel settings for model and prompt
         personality_name = getattr(config, 'DEFAULT_PERSONALITY', 'helpful')
         try:
             self.personality = Personality(personality_name)
@@ -240,9 +241,16 @@ class TelegramOllamaBot:
             chat_id = update.message.chat.id
             self.conversation_manager.add_user_message(chat_id, message_text)
 
+            # Get per-channel settings
+            channel_model = self.channel_settings.get(chat_id, {}).get('model', self.config.OLLAMA_MODEL)
+            channel_prompt = self.channel_settings.get(chat_id, {}).get('prompt', self.custom_prompt)
+
+            # Set the model for this channel
+            self.llm.set_model(channel_model)
+
             # Get conversation context
             # Build prompt with personality
-            personality_prompt = personality_manager.get_system_prompt(self.personality, self.custom_prompt)
+            personality_prompt = personality_manager.get_system_prompt(self.personality, channel_prompt)
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
             # Generate response with full context
