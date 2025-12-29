@@ -8,12 +8,16 @@ A multi-platform AI assistant bot supporting Telegram and Discord, with pluggabl
 
 - **Multi-Platform**: Works on both Telegram and Discord
 - **Multiple LLM Providers**: 6 providers (Ollama, OpenAI, Groq, Together AI, Hugging Face, Anthropic)
-- **Plugin System**: Extensible architecture with dependency management
+- **Plugin System**: Extensible architecture with 4 built-in plugins (Weather, Calculator, Web Search, Admin)
+- **Channel Administration**: Per-channel AI settings for group admins
 - **Admin Controls**: Restricted settings management with granular permissions
 - **Personality System**: 6 distinct bot personalities (Friendly, Professional, Humorous, Helpful, Creative, Concise)
 - **Auto-Content Processing**: News article and YouTube video summarization
 - **Web Search**: Real-time web search with AI analysis and source attribution
+- **Weather Information**: Current weather and 5-day forecasts
+- **Calculator**: Mathematical expression evaluation with advanced functions
 - **Conversation Memory**: Context-aware chat sessions with history management
+- **Persistent Settings**: Database-backed configuration that survives restarts
 - **Security**: Input validation, rate limiting, and access control
 - **Testing**: Comprehensive test suite with 95%+ coverage
 
@@ -66,6 +70,7 @@ python bot.py
 |---------|-------------|---------|
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather | `123456789:ABCdefGHIjklMNOpqrsTUVwxyz` |
 | `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
+| `OPENWEATHERMAP_API_KEY` | Weather API key | - | `your_weather_api_key` |
 
 ### Optional Settings
 
@@ -80,7 +85,7 @@ python bot.py
 | `ANTHROPIC_API_KEY` | Anthropic API key | - | `sk-ant-...` |
 | `DISCORD_BOT_TOKEN` | Discord bot token | - | `MTIz...` |
 | `ADMIN_USER_IDS` | Comma-separated admin user IDs | `[]` | `123456789,987654321` |
-| `ENABLED_PLUGINS` | Active plugins | `telegram,web_search,discord` | `telegram,discord` |
+| `ENABLED_PLUGINS` | Active plugins | `telegram,web_search,discord,weather,calculator` | `telegram,discord` |
 | `DEFAULT_PERSONALITY` | Bot personality | `helpful` | `humorous` |
 | `TIMEOUT` | Request timeout (seconds) | `30` | `60` |
 | `DEFAULT_PROMPT` | System prompt for AI | Custom prompt | - |
@@ -178,6 +183,8 @@ chmod 600 .env
 |---------|-------------|
 | `/ask <message>` | Ask AI a question (Discord: `!ask <message>`) |
 | `/search <query>` | Search the web and get AI-powered answer |
+| `/weather <city>` | Get current weather and 5-day forecast |
+| `/calc <expression>` | Evaluate mathematical expressions |
 
 ### Conversation Management
 
@@ -194,11 +201,21 @@ chmod 600 .env
 | `/model` | Show current AI model and provider info |
 | `/listmodels` | List all available models for current provider |
 | `/changemodel <model>` | Switch AI model |
+| `/setprovider <provider>` | Change AI provider (ollama/openai/groq/etc) |
 | `/setprompt` | Set custom AI system prompt |
 | `/timeout <seconds>` | Set request timeout |
 | `/addadmin <user_id>` | Add new administrator |
 | `/removeadmin <user_id>` | Remove administrator |
 | `/listadmins` | Show all administrators |
+
+### Channel Administration (Channel Admins Only)
+
+| Command | Description |
+|---------|-------------|
+| `/setchannelmodel <model>` | Set AI model for this specific channel |
+| `/setchannelprovider <provider>` | Set AI provider for this channel |
+| `/setchannelhost <url>` | Set Ollama host for this channel |
+| `/setchannelprompt <text>` | Set custom prompt for this channel |
 
 ### Admin Management CLI
 
