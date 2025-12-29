@@ -40,8 +40,8 @@ DEFAULT_PROMPT: str = os.getenv(
 # ===========================================
 
 # Enabled plugins (comma-separated list)
-# Only enable plugins that you have configured in PLUGINS dict
-ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "").split(",") if os.getenv("ENABLED_PLUGINS") else []
+# Enable plugins you want to use (all available by default for quick start)
+ENABLED_PLUGINS: list = os.getenv("ENABLED_PLUGINS", "telegram,web_search,discord").split(",") if os.getenv("ENABLED_PLUGINS") else ["telegram", "web_search", "discord"]
 
 # ===========================================
 # ADMIN CONFIGURATION
