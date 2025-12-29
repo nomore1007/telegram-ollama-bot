@@ -111,7 +111,7 @@ class TelegramOllamaBot:
         from sqlalchemy.orm import sessionmaker
 
         # Use SQLite for simplicity - can be changed to PostgreSQL/MySQL later
-        database_url = getattr(self.config, 'DATABASE_URL', 'sqlite:///deepthought_bot.db')
+        database_url = self.config.get('DATABASE_URL', 'sqlite:///deepthought_bot.db')
         self.db_engine = create_engine(database_url, echo=False)
         self.db_session = sessionmaker(bind=self.db_engine)
 

@@ -153,6 +153,10 @@ class Config:
     def __contains__(self, name):
         return name in settings_manager
 
+    def get(self, key, default=None):
+        """Get a setting value with default."""
+        return settings_manager.get(key, default)
+
 # Create backward-compatible settings object
 settings = Config()
 config = settings
