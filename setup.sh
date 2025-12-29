@@ -28,8 +28,8 @@ cat > settings.py << EOF
 # Bot Identity
 BOT_USERNAME: str = "DeepthoughtBot"
 
-# Enabled plugins
-ENABLED_PLUGINS: list = ["telegram", "web_search"]
+# Enabled plugins (uncomment and configure which plugins to load)
+# ENABLED_PLUGINS: list = ["telegram", "web_search"]
 
 # Ollama AI Configuration
 OLLAMA_HOST: str = "http://localhost:11434"
@@ -68,7 +68,6 @@ echo "✅ Settings.py created with your token"
 export TELEGRAM_BOT_TOKEN="$TOKEN"
 export OLLAMA_HOST="http://localhost:11434"
 export OLLAMA_MODEL="llama2"
-export ENABLED_PLUGINS="telegram,web_search"
 
 echo "✅ Environment variables set"
 
