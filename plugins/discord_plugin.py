@@ -39,7 +39,7 @@ class DiscordPlugin(Plugin):
 
     def get_commands(self) -> List[str]:
         """Return list of commands this plugin handles."""
-        return ["ask", "model", "search"]
+        return ["ask", "model", "search", "addadmin", "removeadmin", "listadmins"]
 
     def get_help_text(self) -> str:
         """Return help text for this plugin."""
@@ -53,8 +53,12 @@ class DiscordPlugin(Plugin):
             "*Examples:*\n"
             "• `!search latest gaming news`\n"
             "• `!search Discord bot development`\n\n"
-            "⚙️ *Bot Information:*\n"
-            "`!model` - Show current AI model and provider\n\n"
+             "⚙️ *Bot Information:*\n"
+             "`!model` - Show current AI model and provider\n\n"
+             "👑 *Admin Commands (Admin Only):*\n"
+             "`!addadmin @user` - Add a user as administrator\n"
+             "`!removeadmin @user` - Remove administrator privileges\n"
+             "`!listadmins` - Show all bot administrators\n\n"
             "📱 *Auto-Features (Always Active):*\n"
             "📰 *News URLs* - Automatic article summarization\n"
             "🎬 *YouTube Links* - Automatic video analysis\n"
@@ -108,6 +112,54 @@ class DiscordPlugin(Plugin):
             except Exception as e:
                 logger.error(f"Discord search error: {e}")
                 await ctx.send("❌ Error performing search.")
+
+        @self.discord_bot.command(name='addadmin')
+        async def addadmin(ctx, member: discord.Member = None):
+            """Add an admin (admin only)."""
+            if ctx.author.id not in self.bot_instance.admin_manager.get_admins():
+                await ctx.send("❌ You are not authorized to manage admins.")
+                return
+
+            if not member:
+                await ctx.send("❌ Usage: `!addadmin @user`")
+                return
+
+            user_id = member.id
+            if self.bot_instance.admin_manager.add_admin(user_id, ctx.author.id):
+                await ctx.send(f"✅ Added {member.mention} as administrator.")
+            else:
+                await ctx.send("❌ Failed to add admin.")
+
+        @self.discord_bot.command(name='removeadmin')
+        async def removeadmin(ctx, member: discord.Member = None):
+            """Remove an admin (admin only)."""
+            if ctx.author.id not in self.bot_instance.admin_manager.get_admins():
+                await ctx.send("❌ You are not authorized to manage admins.")
+                return
+
+            if not member:
+                await ctx.send("❌ Usage: `!removeadmin @user`")
+                return
+
+            user_id = member.id
+            if self.bot_instance.admin_manager.remove_admin(user_id, ctx.author.id):
+                await ctx.send(f"✅ Removed {member.mention} from administrators.")
+            else:
+                await ctx.send("❌ Failed to remove admin.")
+
+        @self.discord_bot.command(name='listadmins')
+        async def listadmins(ctx):
+            """List all admins (admin only)."""
+            if ctx.author.id not in self.bot_instance.admin_manager.get_admins():
+                await ctx.send("❌ You are not authorized to manage admins.")
+                return
+
+            admins = self.bot_instance.admin_manager.get_admins()
+            if not admins:
+                await ctx.send("👑 No administrators configured.")
+            else:
+                admin_list = "\n".join(f"• <@{admin_id}>" for admin_id in admins)
+                await ctx.send(f"👑 **Bot Administrators**\n{admin_list}")
 
         @self.discord_bot.event
         async def on_message(message):
