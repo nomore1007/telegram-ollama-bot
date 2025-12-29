@@ -261,14 +261,12 @@ class TelegramOllamaBot:
         app = app_builder.build()
 
         # Command handlers from plugins
-        import types
         for plugin in plugin_manager.get_enabled_plugins():
             for command in plugin.get_commands():
                 handler_method = getattr(plugin, f"handle_{command}", None)
                 if handler_method:
-                    # Bind the method to the plugin instance properly
-                    bound_method = types.MethodType(handler_method, plugin)
-                    app.add_handler(CommandHandler(command, bound_method))
+                    # getattr on instance returns bound method, use directly
+                    app.add_handler(CommandHandler(command, handler_method))
 
         # Legacy command handlers removed - using plugin system exclusively
 

@@ -188,7 +188,19 @@ class TelegramPlugin(Plugin):
 
     async def handle_listmodels(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listmodels command"""
-        models = await self.bot_instance.llm.list_models()
+        print(f"DEBUG: handle_listmodels called, bot_instance: {self.bot_instance}")
+        if self.bot_instance is None:
+            if update.message:
+                await update.message.reply_text("❌ Plugin not initialized properly")
+            return
+
+        try:
+            models = await self.bot_instance.llm.list_models()
+        except AttributeError as e:
+            print(f"DEBUG: AttributeError in listmodels: {e}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error accessing LLM: {e}")
+            return
         if not models:
             if update.message:
                 await update.message.reply_text("❌ No models found.")
