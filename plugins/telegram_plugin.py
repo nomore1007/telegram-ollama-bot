@@ -173,11 +173,17 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
             ]
             print(f"🔍 MENU KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
-            await update.message.reply_text(
+
+            # Create the markup
+            markup = InlineKeyboardMarkup(keyboard)
+            print(f"🔍 INLINE KEYBOARD CREATED: {markup}")
+
+            result = await update.message.reply_text(
                 "🤖 *Bot Menu*\n\nChoose an option:",
-                reply_markup=InlineKeyboardMarkup(keyboard),
+                reply_markup=markup,
                 parse_mode="Markdown"
             )
+            print(f"🔍 MESSAGE SENT RESULT: {result}")
             print("🔍 MODEL MENU SENT")
 
     async def handle_model_info(self, update, context: ContextTypes.DEFAULT_TYPE):
@@ -827,12 +833,16 @@ class TelegramPlugin(Plugin):
             await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=back_button)
 
     async def handle_userid(self, update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /userid command - shows user's Telegram ID"""
+        """Handle /userid command - shows user's Telegram ID and bot info"""
         user_id = update.effective_user.id if update.effective_user else "Unknown"
+        bot_username = getattr(self.bot, 'bot_username', 'Unknown')
         if update.message:
             await update.message.reply_text(
+                f"🤖 *Bot Info:*\n"
+                f"Username: @{bot_username}\n\n"
                 f"🆔 *Your Telegram User ID:*\n`{user_id}`\n\n"
-                "💡 *Use this ID for admin management commands like `/addadmin {user_id}`*",
+                "💡 *Use this ID for admin management commands like `/addadmin {user_id}`*\n\n"
+                "🔍 *Debug: If buttons don't work, ensure you're talking to the correct bot!*",
                 parse_mode="Markdown"
             )
 

@@ -448,11 +448,26 @@ class TelegramOllamaBot:
             print(f"🔍 DEBUG: Created handlers - model: {model_handler}, menu: {menu_handler}")
 
             # Add them to the app
-            app.add_handler(model_handler)
-            app.add_handler(menu_handler)
+            try:
+                app.add_handler(model_handler)
+                print("🔍 DEBUG: Model handler added successfully")
+            except Exception as e:
+                print(f"🔍 ERROR adding model handler: {e}")
+                import traceback
+                print(f"🔍 TRACEBACK: {traceback.format_exc()}")
+
+            try:
+                app.add_handler(menu_handler)
+                print("🔍 DEBUG: Menu handler added successfully")
+            except Exception as e:
+                print(f"🔍 ERROR adding menu handler: {e}")
+                import traceback
+                print(f"🔍 TRACEBACK: {traceback.format_exc()}")
 
             print("🔍 DEBUG: Callback handlers registered with Telegram app")
-            print(f"🔍 DEBUG: App handlers count: {len(app.handlers)}")
+            print(f"🔍 DEBUG: App has {len(app.handlers)} handler groups")
+            total_handlers = sum(len(group) for group in app.handlers)
+            print(f"🔍 DEBUG: Total handlers across all groups: {total_handlers}")
             logger.info("Callback handlers registered")
 
             # Add a catch-all callback handler for debugging
