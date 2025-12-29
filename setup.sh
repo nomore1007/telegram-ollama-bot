@@ -32,7 +32,7 @@ TELEGRAM_BOT_TOKEN: str = "$TOKEN"
 BOT_USERNAME: str = "DeepthoughtBot"
 
 # Ollama AI Configuration
-OLLAMA_HOST: str = "http://buntcomm.com:11434"
+OLLAMA_HOST: str = "http://localhost:11434"
 OLLAMA_MODEL: str = "llama2"
 
 # AI Model Parameters
@@ -55,7 +55,7 @@ echo "✅ Settings.py created with your token"
 
 # Set environment variable as backup
 export TELEGRAM_BOT_TOKEN="$TOKEN"
-export OLLAMA_HOST="http://buntcomm.com:11434"
+export OLLAMA_HOST="http://localhost:11434"
 export OLLAMA_MODEL="llama2"
 
 echo "✅ Environment variables set"
