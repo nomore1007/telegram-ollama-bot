@@ -528,7 +528,9 @@ class TelegramOllamaBot:
 
         # Start the bot
         logger.info("Starting Telegram Ollama bot")
-        app.run_polling()
+        print("🔍 STARTING POLLING...")
+        app.run_polling(allowed_updates=["message", "callback_query"])
+        print("🔍 POLLING STARTED")
 
     def run_discord_bot(self):
         """Run Discord bot if enabled."""
