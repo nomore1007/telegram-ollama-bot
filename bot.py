@@ -387,7 +387,16 @@ class TelegramOllamaBot:
 
                     except Exception as e:
                         logger.error(f"Error processing article {url}: {type(e).__name__}")
-                        await update.message.reply_text(f"❌ Failed to process article. Please try again later.")
+                        # Try to get more specific error from summarizer
+                        try:
+                            article_data = await self.news_summarizer.extract_article_content(url)
+                            if not article_data["success"]:
+                                error_msg = article_data.get("error", "Unknown error")
+                                await update.message.reply_text(f"❌ Failed to process article: {error_msg}")
+                            else:
+                                await update.message.reply_text("❌ Failed to summarize article. Please try again later.")
+                        except:
+                            await update.message.reply_text("❌ Failed to process article. Please try again later.")
 
                 return
 

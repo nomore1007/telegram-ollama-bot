@@ -73,8 +73,22 @@ class NewsSummarizer:
                 "summary": article.summary if hasattr(article, 'summary') else None
             }
         except Exception as e:
-            logger.error(f"Error extracting article from {url}: {type(e).__name__}")
-            return {"success": False, "error": "Failed to extract article content"}
+            error_type = type(e).__name__
+            logger.error(f"Error extracting article from {url}: {error_type}")
+
+            # Provide more user-friendly error messages
+            if "timeout" in str(e).lower() or error_type == "TimeoutError":
+                error_msg = "Article took too long to load"
+            elif "403" in str(e) or "forbidden" in str(e).lower():
+                error_msg = "Article access blocked (possibly paywall or region restriction)"
+            elif "404" in str(e) or "not found" in str(e).lower():
+                error_msg = "Article not found"
+            elif "connection" in str(e).lower():
+                error_msg = "Network connection error"
+            else:
+                error_msg = f"Could not extract article content ({error_type})"
+
+            return {"success": False, "error": error_msg}
 
     async def summarize_with_ai(self, article_data: dict) -> str:
         """Use AI to summarize the article"""
