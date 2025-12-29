@@ -5,6 +5,8 @@ import asyncio
 import re
 import sys
 import os
+from datetime import datetime
+from typing import Dict, Any
 
 # Load settings using the settings manager
 from settings_manager import settings_manager, settings, config
@@ -39,6 +41,8 @@ from plugins.weather_plugin import WeatherPlugin
 from plugins.calculator_plugin import CalculatorPlugin
 from plugins.currency_plugin import CurrencyPlugin
 from plugins.translation_plugin import TranslationPlugin
+from plugins.trivia_plugin import TriviaPlugin
+from plugins.url_shortener_plugin import URLShortenerPlugin
 from database import ChannelSettings
 
 
@@ -203,6 +207,8 @@ class TelegramOllamaBot:
         plugin_manager.load_plugin("calculator", CalculatorPlugin, plugin_configs.get('calculator', {}))
         plugin_manager.load_plugin("currency", CurrencyPlugin, plugin_configs.get('currency', {}))
         plugin_manager.load_plugin("translation", TranslationPlugin, plugin_configs.get('translation', {}))
+        plugin_manager.load_plugin("trivia", TriviaPlugin, plugin_configs.get('trivia', {}))
+        plugin_manager.load_plugin("url_shortener", URLShortenerPlugin, plugin_configs.get('url_shortener', {}))
 
         # Filter enabled plugins based on configuration requirements
         filtered_plugins = []
@@ -288,6 +294,11 @@ class TelegramOllamaBot:
                     logger.info(f"Bot not mentioned in group chat, ignoring")
                     # If in group chat and bot not mentioned, ignore
                     return
+
+            # Check if this is an answer to a trivia question
+            trivia_handled = await self._check_trivia_answer(update, context)
+            if trivia_handled:
+                return
 
             # If not a group chat or bot was mentioned in a group chat
             # Process the message with AI
@@ -680,6 +691,112 @@ class TelegramOllamaBot:
                 discord_plugin.run_discord_bot(discord_token)
             else:
                 logger.warning("Discord bot token not configured")
+
+    def health_check(self) -> Dict[str, Any]:
+        """Perform a basic health check of the bot and its components"""
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'components': {}
+        }
+
+        # Check database
+        try:
+            # Simple database check
+            health_status['components']['database'] = 'healthy'
+        except Exception as e:
+            health_status['components']['database'] = f'unhealthy: {str(e)}'
+            health_status['status'] = 'degraded'
+
+        # Check LLM client
+        try:
+            if hasattr(self, 'llm') and self.llm:
+                health_status['components']['llm'] = 'healthy'
+            else:
+                health_status['components']['llm'] = 'unhealthy: LLM client not initialized'
+                health_status['status'] = 'degraded'
+        except Exception as e:
+            health_status['components']['llm'] = f'unhealthy: {str(e)}'
+            health_status['status'] = 'degraded'
+
+        # Check plugins
+        enabled_plugins = plugin_manager.get_enabled_plugins()
+        health_status['components']['plugins'] = {
+            'total': len(enabled_plugins),
+            'enabled': [p.name for p in enabled_plugins]
+        }
+
+        return health_status
+
+    async def _check_trivia_answer(self, update, context):
+        """Check if the message is an answer to a trivia question"""
+        if not update.message or not update.message.text:
+            return False
+
+        if context.user_data is None:
+            return False
+
+        # Check if there's an active quiz or single question
+        quiz_active = context.user_data.get('quiz_active', False)
+        current_question = context.user_data.get('current_question')
+
+        if not (quiz_active or current_question):
+            return False
+
+        # Get trivia plugin
+        trivia_plugin = plugin_manager.plugins.get('trivia')
+        if not trivia_plugin or trivia_plugin not in plugin_manager.get_enabled_plugins():
+            return False
+
+        # Type check for TriviaPlugin
+        if not hasattr(trivia_plugin, 'ask_next_question'):
+            return False
+
+        user_answer = update.message.text.strip().lower()
+        correct_answer = current_question['answer'].strip().lower()
+
+        # Simple answer matching (could be improved with fuzzy matching)
+        is_correct = user_answer == correct_answer
+
+        # Clear the current question
+        context.user_data['current_question'] = None
+
+        if quiz_active:
+            # Update score
+            if is_correct:
+                context.user_data['quiz_score'] = context.user_data.get('quiz_score', 0) + 1
+
+            score = context.user_data.get('quiz_score', 0)
+            questions = context.user_data.get('quiz_questions', 0)
+
+            result_emoji = "✅" if is_correct else "❌"
+            correct_text = f"**{current_question['answer']}**" if not is_correct else ""
+
+            await update.message.reply_text(
+                f"{result_emoji} {correct_text}\n"
+                f"📊 Score: {score}/{questions}\n\n",
+                parse_mode="Markdown"
+            )
+
+            # Ask next question after a short delay
+            import asyncio
+            await asyncio.sleep(1)  # Brief pause
+            ask_next = getattr(trivia_plugin, 'ask_next_question', None)
+            if ask_next:
+                await ask_next(update, context)
+        else:
+            # Single question response
+            result_emoji = "✅" if is_correct else "❌"
+            correct_text = f"**{current_question['answer']}**" if not is_correct else ""
+
+            await update.message.reply_text(
+                f"{result_emoji} {correct_text}\n\n"
+                f"Want another question? Use `/question`!\n"
+                f"Or start a quiz with `/trivia`!",
+                parse_mode="Markdown"
+            )
+
+        return True  # Message was handled by trivia
 
 
 # -------------------------------------------------------------------

@@ -5,7 +5,8 @@ Provides weather information using OpenWeatherMap API
 
 import logging
 import aiohttp
-from typing import List
+import time
+from typing import List, Dict, Any, Optional
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -17,10 +18,40 @@ logger = logging.getLogger(__name__)
 class WeatherPlugin(Plugin):
     """Plugin that provides weather information"""
 
-    def __init__(self, name: str, config: dict = None):
+    def __init__(self, name: str, config: Optional[Dict[str, Any]] = None):
         super().__init__(name, config)
-        self.api_key = config.get('api_key') if config else None
+        self.cache: Dict[str, Dict[str, Any]] = {}
+        self.cache_ttl = 600  # 10 minutes cache
         logger.info("Weather plugin initialized")
+
+    def initialize(self, bot_instance) -> None:
+        """Initialize the plugin with bot instance"""
+        super().initialize(bot_instance)
+
+    @property
+    def api_key(self) -> Optional[str]:
+        """Get the OpenWeatherMap API key from config"""
+        return self.config.get('api_key')
+
+    def _get_cached_weather(self, city: str) -> Optional[str]:
+        """Get cached weather response if available and not expired"""
+        cache_key = city.lower()
+        if cache_key in self.cache:
+            cached_data = self.cache[cache_key]
+            if time.time() - cached_data['timestamp'] < self.cache_ttl:
+                return cached_data['response']
+            else:
+                # Remove expired cache
+                del self.cache[cache_key]
+        return None
+
+    def _cache_weather(self, city: str, response: str) -> None:
+        """Cache weather response"""
+        cache_key = city.lower()
+        self.cache[cache_key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
 
     def get_commands(self) -> List[str]:
         """Return list of commands this plugin handles."""
@@ -62,6 +93,13 @@ class WeatherPlugin(Plugin):
 
         city = " ".join(context.args)
         logger.info(f"Getting weather for: {city}")
+
+        # Check cache first
+        cached_data = self._get_cached_weather(city)
+        if cached_data:
+            logger.info(f"Using cached weather data for: {city}")
+            await update.message.reply_text(cached_data, parse_mode="Markdown")
+            return
 
         try:
             # Get current weather
@@ -112,6 +150,9 @@ class WeatherPlugin(Plugin):
                     response += f"• {date}: {temp}°C, {desc}\n"
 
             await update.message.reply_text(response, parse_mode="Markdown")
+
+            # Cache the response
+            self._cache_weather(city, response)
 
         except Exception as e:
             logger.error(f"Weather API error: {e}")
