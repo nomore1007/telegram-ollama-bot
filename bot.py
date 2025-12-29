@@ -491,11 +491,20 @@ class TelegramOllamaBot:
         # Debug handler for all updates (highest priority)
         async def debug_update_handler(update, context):
             print(f"🔍 UPDATE RECEIVED: {type(update).__name__}")
+            if hasattr(update, 'update_id'):
+                print(f"🔍 UPDATE ID: {update.update_id}")
             if hasattr(update, 'message') and update.message:
                 print(f"🔍 MESSAGE: {update.message.text if hasattr(update.message, 'text') else 'NO TEXT'}")
             if hasattr(update, 'callback_query') and update.callback_query:
                 print(f"🔍 CALLBACK QUERY: {update.callback_query.data}")
                 print(f"🔍 CALLBACK ID: {update.callback_query.id}")
+                print(f"🔍 CALLBACK FROM: {update.callback_query.from_user.username if update.callback_query.from_user else 'UNKNOWN'}")
+                # Answer the callback to prevent timeout
+                try:
+                    await update.callback_query.answer()
+                    print("🔍 CALLBACK ANSWERED")
+                except Exception as e:
+                    print(f"🔍 ERROR ANSWERING CALLBACK: {e}")
             return False  # Don't consume the update
 
         app.add_handler(TypeHandler(object, debug_update_handler), group=0)  # Highest priority
