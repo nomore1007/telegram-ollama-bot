@@ -242,11 +242,26 @@ class TelegramOllamaBot:
             self.conversation_manager.add_user_message(chat_id, message_text)
 
             # Get per-channel settings
-            channel_model = self.channel_settings.get(chat_id, {}).get('model', self.config.OLLAMA_MODEL)
-            channel_prompt = self.channel_settings.get(chat_id, {}).get('prompt', self.custom_prompt)
+            channel_settings = self.channel_settings.get(chat_id, {})
+            channel_model = channel_settings.get('model', self.config.OLLAMA_MODEL)
+            channel_prompt = channel_settings.get('prompt', self.custom_prompt)
+            channel_provider = channel_settings.get('provider', 'ollama')
+            channel_host = channel_settings.get('host') if channel_provider == 'ollama' else None
 
-            # Set the model for this channel
-            self.llm.set_model(channel_model)
+            # Get API key for the provider
+            api_key = None
+            if channel_provider != 'ollama':
+                api_key_env = f'{channel_provider.upper()}_API_KEY'
+                api_key = getattr(self.config, api_key_env, None)
+
+            # Create LLM client for this channel's provider
+            from llm_client import LLMClient
+            channel_llm = LLMClient(
+                provider=channel_provider,
+                model=channel_model,
+                host=channel_host,
+                api_key=api_key
+            )
 
             # Get conversation context
             # Build prompt with personality
@@ -254,7 +269,7 @@ class TelegramOllamaBot:
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
 
             # Generate response with full context
-            response = await self.llm.generate(context)
+            response = await channel_llm.generate(context)
 
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)

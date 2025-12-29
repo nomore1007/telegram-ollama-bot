@@ -46,7 +46,7 @@ class TelegramPlugin(Plugin):
         """Return list of commands this plugin handles."""
         return [
             "start", "help", "menu", "model", "listmodels", "setmodel", "changemodel",
-            "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
+            "setprovider", "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
             "personality", "setpersonality", "clear"
         ]
 
@@ -152,6 +152,7 @@ class TelegramPlugin(Plugin):
                 "`/menu` - Show the main menu\n"
              "`/model` - Show current AI model info\n"
              "`/listmodels` - List all available AI models\n"
+             "`/setprovider <provider> [host]` - Set AI provider for this channel\n"
              "`/setmodel <model>` - Set AI model for this channel\n"
              "`/changemodel` - Show model selection menu\n"
              "`/setprompt` - Set custom AI prompt for this channel\n"
@@ -197,19 +198,29 @@ class TelegramPlugin(Plugin):
 
     async def handle_listmodels(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /listmodels command"""
-        print(f"DEBUG: handle_listmodels called, bot: {self.bot}")
         if self.bot is None:
             if update.message:
                 await update.message.reply_text("❌ Plugin not initialized properly")
             return
 
+        channel_id = update.effective_chat.id if update.effective_chat else None
+        channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+        provider = channel_settings.get('provider', 'ollama')
+        host = channel_settings.get('host') if provider == 'ollama' else None
+        api_key = None
+        if provider != 'ollama':
+            api_key_env = f'{provider.upper()}_API_KEY'
+            api_key = getattr(self.bot.config, api_key_env, None)
+
+        from llm_client import LLMClient
         try:
-            models = await self.bot.llm.list_models()
-        except AttributeError as e:
-            print(f"DEBUG: AttributeError in listmodels: {e}")
+            channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+            models = await channel_llm.list_models()
+        except Exception as e:
             if update.message:
                 await update.message.reply_text(f"❌ Error accessing LLM: {e}")
             return
+
         if not models:
             if update.message:
                 await update.message.reply_text("❌ No models found.")
@@ -217,16 +228,36 @@ class TelegramPlugin(Plugin):
 
         text = "\n".join(f"• {m}" for m in models)
         if update.message:
-            await update.message.reply_text(f"🤖 Available models:\n{text}")
+            await update.message.reply_text(f"🤖 Available models for {provider}:\n{text}")
 
     @require_admin
     async def handle_changemodel(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /changemodel command - show model selection menu"""
         if update.message:
-            models = await self.bot.llm.list_models()
+            channel_id = update.effective_chat.id if update.effective_chat else None
+            channel_settings = self.bot.channel_settings.get(channel_id, {}) if channel_id else {}
+            provider = channel_settings.get('provider', 'ollama')
+            host = channel_settings.get('host') if provider == 'ollama' else None
+            api_key = None
+            if provider != 'ollama':
+                api_key_env = f'{provider.upper()}_API_KEY'
+                api_key = getattr(self.bot.config, api_key_env, None)
+
+            from llm_client import LLMClient
+            try:
+                channel_llm = LLMClient(provider=provider, host=host, api_key=api_key)
+                models = await channel_llm.list_models()
+            except Exception as e:
+                await update.message.reply_text(f"❌ Error accessing LLM: {e}")
+                return
+
             if not models:
                 await update.message.reply_text("❌ No models available.")
                 return
+
+            # Store models list for callback
+            if context.user_data is not None:
+                context.user_data['model_list'] = models
 
             # Use index-based callback data to avoid length limits
             keyboard = [
@@ -235,8 +266,9 @@ class TelegramPlugin(Plugin):
             ]
             keyboard.append([InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")])
 
+            current_model = channel_settings.get('model', self.bot.config.OLLAMA_MODEL)
             await update.message.reply_text(
-                f"🤖 *Select a Model*\n\n(Current: `{self.bot.config.OLLAMA_MODEL}`)",
+                f"🤖 *Select a Model for {provider}*\n\n(Current: `{current_model}`)",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
@@ -256,10 +288,88 @@ class TelegramPlugin(Plugin):
             if update.message:
                 await update.message.reply_text(
                     f"🤖 Available models:\n{model_list}\n\n"
-                    f"💡 Usage: `/changemodel <model_name>`\n"
+                    f"💡 Usage: `/setmodel <model_name>`\n"
                     f"📍 Current: `{self.bot.config.OLLAMA_MODEL}`",
                     parse_mode="Markdown"
                 )
+            return
+
+        # Get the requested model name
+        requested_model = " ".join(context.args)
+
+        # Validate the model exists
+        models = await self.bot.llm.list_models()
+        if requested_model not in models:
+            if update.message:
+                await update.message.reply_text(
+                    f"❌ Model `{requested_model}` not found.\n\n"
+                    f"📋 Available models:\n" + "\n".join(f"• `{m}`" for m in models[:10]) +
+                    (f"\n... and {len(models)-10} more" if len(models) > 10 else ""),
+                    parse_mode="Markdown"
+                )
+            return
+
+        # Update the model for this channel
+        channel_id = update.effective_chat.id if update.effective_chat else None
+        if channel_id:
+            self.bot.channel_settings.setdefault(channel_id, {})['model'] = requested_model
+
+        if update.message:
+            await update.message.reply_text(
+                f"✅ Model changed to: `{requested_model}`\n\n"
+                f"🧠 The bot will now use this model for AI responses in this channel.",
+                parse_mode="Markdown"
+            )
+
+    @require_admin
+    async def handle_setprovider(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setprovider command"""
+        supported_providers = ['ollama', 'openai', 'groq', 'together', 'huggingface', 'anthropic']
+
+        if not context.args or len(context.args) == 0:
+            # Show available providers
+            provider_list = "\n".join(f"• `{p}`" for p in supported_providers)
+            channel_id = update.effective_chat.id if update.effective_chat else None
+            current_provider = self.bot.channel_settings.get(channel_id, {}).get('provider', 'ollama') if channel_id else 'ollama'
+            if update.message:
+                await update.message.reply_text(
+                    f"🤖 Available providers:\n{provider_list}\n\n"
+                    f"💡 Usage: `/setprovider <provider>` or `/setprovider ollama <host>`\n"
+                    f"📍 Current: `{current_provider}`",
+                    parse_mode="Markdown"
+                )
+            return
+
+        provider = context.args[0].lower()
+        if provider not in supported_providers:
+            if update.message:
+                await update.message.reply_text(
+                    f"❌ Provider `{provider}` not supported.\n\n"
+                    f"📋 Available: {', '.join(supported_providers)}",
+                    parse_mode="Markdown"
+                )
+            return
+
+        # Update the provider for this channel
+        channel_id = update.effective_chat.id if update.effective_chat else None
+        if channel_id:
+            self.bot.channel_settings.setdefault(channel_id, {})['provider'] = provider
+
+            # If ollama and host provided
+            host = None
+            if provider == 'ollama' and len(context.args) > 1:
+                host = context.args[1]
+                self.bot.channel_settings[channel_id]['host'] = host
+
+            reply = f"✅ Provider set to: `{provider}`"
+            if host:
+                reply += f" with host `{host}`"
+            reply += "\n\n🧠 The bot will now use this provider for AI responses in this channel."
+        else:
+            reply = "❌ Unable to set provider for this chat."
+
+        if update.message:
+            await update.message.reply_text(reply, parse_mode="Markdown")
             return
 
         # Get the requested model name
