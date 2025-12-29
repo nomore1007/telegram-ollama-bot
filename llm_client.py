@@ -376,8 +376,10 @@ class LLMClient:
     def _create_provider(self, provider: str, **kwargs) -> LLMProvider:
         """Create provider instance"""
         if provider == "ollama":
+            host = kwargs.get('host', 'http://localhost:11434')
+            logger.debug(f"Creating Ollama provider with host: {host}")
             return OllamaProvider(
-                host=kwargs.get('host', 'http://localhost:11434'),
+                host=host,
                 timeout=kwargs.get('timeout', 30)
             )
         elif provider == "openai":
