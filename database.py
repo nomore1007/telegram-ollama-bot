@@ -116,7 +116,7 @@ class UsageStats(Base):
     user_id = Column(Integer, ForeignKey('users.id'), index=True)
     action = Column(String(100), nullable=False)  # message_sent, video_processed, etc.
     value = Column(Float, default=1.0)  # count, duration, etc.
-    metadata = Column(Text)  # JSON additional data
+    extra_data = Column(Text)  # JSON additional data
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
