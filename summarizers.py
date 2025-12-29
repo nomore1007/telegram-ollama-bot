@@ -803,4 +803,12 @@ Keep it informative and well-structured."""
         response += "📋 *Summary:*\n"
         response += summary
 
+        # Validate final response
+        if not response or len(response.strip()) == 0:
+            return "❌ Failed to generate video summary: No content available."
+
+        # Ensure response doesn't exceed Telegram limits
+        if len(response) > 4000:
+            response = response[:3950] + "\n\n*[Summary truncated due to length]*"
+
         return response

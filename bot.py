@@ -378,6 +378,11 @@ class TelegramOllamaBot:
 
                         # Send summary with timeout protection
                         try:
+                            # Validate summary before sending
+                            if not summary or len(summary.strip()) == 0:
+                                await update.message.reply_text("❌ Failed to generate video summary.")
+                                continue
+
                             if len(summary) > MAX_MESSAGE_LENGTH:
                                 parts = [summary[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
                                 for i, part in enumerate(parts):
@@ -392,8 +397,16 @@ class TelegramOllamaBot:
                                 )
                         except asyncio.TimeoutError:
                             logger.warning("Timeout sending video summary")
+                            try:
+                                await update.message.reply_text("⏳ Summary is ready but took too long to send.")
+                            except:
+                                pass
                         except Exception as e:
                             logger.warning(f"Failed to send video summary: {type(e).__name__}")
+                            try:
+                                await update.message.reply_text("❌ Failed to send video summary.")
+                            except:
+                                pass
 
                     except Exception as e:
                         logger.error(f"Error processing video {url}: {type(e).__name__}")
