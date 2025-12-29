@@ -47,7 +47,8 @@ class TelegramPlugin(Plugin):
         return [
             "start", "help", "menu", "model", "listmodels", "setmodel", "changemodel",
             "setprovider", "setprompt", "timeout", "userid", "addadmin", "removeadmin", "listadmins",
-            "personality", "setpersonality", "clear"
+            "personality", "setpersonality", "clear",
+            "setchannelmodel", "setchannelhost", "setchannelprovider", "setchannelprompt"
         ]
 
     def get_help_text(self) -> str:
@@ -83,8 +84,17 @@ class TelegramPlugin(Plugin):
             "`/listmodels` - List available models for current provider\n"
              "`/setmodel <model>` - Set AI model for this channel\n"
              "`/changemodel` - Show model selection menu\n"
+            "`/setprovider <provider>` - Change AI provider (ollama/openai/groq/etc)\n"
             "`/setprompt` - Customize AI system prompt\n"
             "`/timeout <seconds>` - Set response timeout (1-600s)\n\n"
+            "🏢 *Channel Administration (Channel Admins Only):*\n"
+            "`/setchannelmodel <model>` - Set AI model for this specific channel\n"
+            "`/setchannelprovider <provider>` - Set AI provider for this channel\n"
+            "`/setchannelhost <url>` - Set Ollama host for this channel\n"
+            "`/setchannelprompt <text>` - Set custom prompt for this channel\n"
+            "• Channel settings override global settings\n"
+            "• Only channel administrators can use these commands\n"
+            "• Use `/setchannelprompt reset` to revert to global prompt\n\n"
             "👑 *Administrator Controls (Admin Only):*\n"
             "`/addadmin <user_id>` - Grant admin privileges\n"
             "`/removeadmin <user_id>` - Revoke admin privileges\n"
@@ -617,9 +627,6 @@ class TelegramPlugin(Plugin):
                     parse_mode="Markdown"
                 )
 
-            elif action == "test_callback":
-                await query.edit_message_text("✅ Test button works! Callbacks are functioning.", reply_markup=back_button)
-
             else:
                 await query.edit_message_text("❌ Unknown menu option.", reply_markup=back_button)
 
@@ -647,18 +654,11 @@ class TelegramPlugin(Plugin):
                 await query.edit_message_text("❌ Invalid callback data.")
                 return
 
-            logger.info(f"Model callback received for user")
-
             # Parse index from callback data
             model_idx = int(query.data.split(":", 1)[1])
 
             # Get model list from user_data
-            model_list = []
-            if context.user_data:
-                model_list = context.user_data.get('model_list', [])
-                logger.info(f"Found model_list in user_data: {len(model_list)} models")
-            else:
-                logger.warning("No user_data available in context")
+            model_list = context.user_data.get('model_list', []) if context.user_data else []
 
             # Validate index
             if not model_list or not (0 <= model_idx < len(model_list)):
@@ -947,3 +947,192 @@ class TelegramPlugin(Plugin):
         else:
             if update.message:
                 await update.message.reply_text("❌ Unable to clear conversation.")
+
+    @require_admin
+    async def handle_setchannelmodel(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setchannelmodel command - set model for this channel (admins only)"""
+        if not update.message:
+            return
+
+        channel_id = str(update.message.chat.id)
+
+        if not context.args:
+            # Show current model and available models
+            current_model = self.bot.get_channel_setting(channel_id, 'model')
+            provider = self.bot.get_channel_setting(channel_id, 'provider')
+
+            try:
+                from llm_client import LLMClient
+                llm = LLMClient(provider=provider)
+                available_models = await llm.list_models()
+                model_list = "\n".join(f"• `{m}`" for m in available_models[:10])
+                if len(available_models) > 10:
+                    model_list += f"\n... and {len(available_models)-10} more"
+
+                await update.message.reply_text(
+                    f"🤖 *Current Channel Model:* `{current_model}`\n\n"
+                    f"📋 *Available Models for {provider}:*\n{model_list}\n\n"
+                    f"💡 *Usage:* `/setchannelmodel <model_name>`",
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                await update.message.reply_text(f"❌ Error loading models: {e}")
+            return
+
+        requested_model = " ".join(context.args)
+
+        # Validate the model exists
+        provider = self.bot.get_channel_setting(channel_id, 'provider')
+        try:
+            from llm_client import LLMClient
+            llm = LLMClient(provider=provider)
+            available_models = await llm.list_models()
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error validating model: {e}")
+            return
+
+        if requested_model not in available_models:
+            await update.message.reply_text(
+                f"❌ Model `{requested_model}` not found.\n\n"
+                f"📋 Available models: {', '.join(available_models[:5])}"
+                f"{'...' if len(available_models) > 5 else ''}"
+            )
+            return
+
+        # Save the setting
+        self.bot.save_channel_setting(channel_id, 'model', requested_model)
+        await update.message.reply_text(
+            f"✅ Channel model updated to: `{requested_model}`\n\n"
+            f"🧠 This affects all AI responses in this channel.",
+            parse_mode="Markdown"
+        )
+
+    @require_admin
+    async def handle_setchannelhost(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setchannelhost command - set Ollama host for this channel (admins only)"""
+        if not update.message:
+            return
+
+        channel_id = str(update.message.chat.id)
+
+        if not context.args:
+            current_host = self.bot.get_channel_setting(channel_id, 'host')
+            await update.message.reply_text(
+                f"🌐 *Current Channel Host:* `{current_host}`\n\n"
+                f"💡 *Usage:* `/setchannelhost http://your-ollama-host:port`\n\n"
+                f"⚠️ *Note:* Only works with Ollama provider",
+                parse_mode="Markdown"
+            )
+            return
+
+        host_url = context.args[0]
+
+        # Basic URL validation
+        if not host_url.startswith('http://') and not host_url.startswith('https://'):
+            await update.message.reply_text("❌ Host must start with http:// or https://")
+            return
+
+        # Save the setting
+        self.bot.save_channel_setting(channel_id, 'host', host_url)
+        await update.message.reply_text(
+            f"✅ Channel Ollama host updated to: `{host_url}`\n\n"
+            f"🌐 This affects Ollama connections in this channel.",
+            parse_mode="Markdown"
+        )
+
+    @require_admin
+    async def handle_setchannelprovider(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setchannelprovider command - set AI provider for this channel (admins only)"""
+        if not update.message:
+            return
+
+        channel_id = str(update.message.chat.id)
+
+        if not context.args:
+            current_provider = self.bot.get_channel_setting(channel_id, 'provider')
+            await update.message.reply_text(
+                f"🤖 *Current Channel Provider:* `{current_provider}`\n\n"
+                f"📋 *Available Providers:*\n"
+                f"• `ollama` - Local Ollama instance\n"
+                f"• `openai` - OpenAI GPT models\n"
+                f"• `groq` - Groq fast inference\n"
+                f"• `together` - Together AI models\n"
+                f"• `huggingface` - Hugging Face models\n"
+                f"• `anthropic` - Claude models\n\n"
+                f"💡 *Usage:* `/setchannelprovider <provider>`",
+                parse_mode="Markdown"
+            )
+            return
+
+        provider = context.args[0].lower()
+        valid_providers = ['ollama', 'openai', 'groq', 'together', 'huggingface', 'anthropic']
+
+        if provider not in valid_providers:
+            await update.message.reply_text(
+                f"❌ Invalid provider: `{provider}`\n\n"
+                f"📋 Valid providers: {', '.join(valid_providers)}",
+                parse_mode="Markdown"
+            )
+            return
+
+        # Save the setting
+        self.bot.save_channel_setting(channel_id, 'provider', provider)
+
+        # Reset model to default for new provider
+        default_model = 'llama2' if provider == 'ollama' else None
+        if default_model:
+            self.bot.save_channel_setting(channel_id, 'model', default_model)
+
+        await update.message.reply_text(
+            f"✅ Channel provider updated to: `{provider}`\n\n"
+            f"🤖 All AI responses in this channel will now use {provider}.\n\n"
+            f"💡 *Tip:* Use `/setchannelmodel` to choose a specific model.",
+            parse_mode="Markdown"
+        )
+
+    @require_admin
+    async def handle_setchannelprompt(self, update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /setchannelprompt command - set custom prompt for this channel (admins only)"""
+        if not update.message:
+            return
+
+        channel_id = str(update.message.chat.id)
+
+        if not context.args:
+            current_prompt = self.bot.get_channel_setting(channel_id, 'prompt')
+            if current_prompt and current_prompt != self.bot.custom_prompt:
+                await update.message.reply_text(
+                    f"💬 *Current Channel Prompt:*\n```{current_prompt}```\n\n"
+                    f"💡 *Usage:* `/setchannelprompt Your custom system prompt here`\n\n"
+                    f"🔄 *Reset:* `/setchannelprompt reset` to use global prompt",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    f"💬 *Channel uses global prompt*\n\n"
+                    f"💡 *Usage:* `/setchannelprompt Your custom system prompt here`\n\n"
+                    f"📝 *Global prompt:* ```{self.bot.custom_prompt}```",
+                    parse_mode="Markdown"
+                )
+            return
+
+        prompt_text = " ".join(context.args)
+
+        if prompt_text.lower() == 'reset':
+            # Remove channel-specific prompt
+            self.bot.save_channel_setting(channel_id, 'prompt', None)
+            await update.message.reply_text(
+                "✅ Channel prompt reset to global default.\n\n"
+                f"📝 *Global prompt:* ```{self.bot.custom_prompt}```",
+                parse_mode="Markdown"
+            )
+            return
+
+        # Save the custom prompt
+        self.bot.save_channel_setting(channel_id, 'prompt', prompt_text)
+        await update.message.reply_text(
+            f"✅ Channel prompt updated!\n\n"
+            f"💬 *New prompt:* ```{prompt_text}```\n\n"
+            f"🧠 This will affect all AI responses in this channel.",
+            parse_mode="Markdown"
+        )
