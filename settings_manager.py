@@ -86,7 +86,7 @@ class SettingsManager:
                     # Split on first = only
                     parts = line.split('=', 1)
                     if len(parts) == 2:
-                        var_name = parts[0].strip()
+                        var_name = parts[0].split(':')[0].strip()
                         var_value_str = parts[1].strip()
 
                         # Skip if it looks like a complex expression or function call
