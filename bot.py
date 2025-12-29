@@ -490,6 +490,7 @@ class TelegramOllamaBot:
 
         # Debug handler for all updates (highest priority)
         async def debug_update_handler(update, context):
+            print(f"🔍 DEBUG HANDLER CALLED: {type(update).__name__}")
             print(f"🔍 UPDATE RECEIVED: {type(update).__name__}")
             if hasattr(update, 'update_id'):
                 print(f"🔍 UPDATE ID: {update.update_id}")
@@ -507,7 +508,18 @@ class TelegramOllamaBot:
                     print(f"🔍 ERROR ANSWERING CALLBACK: {e}")
             return False  # Don't consume the update
 
+        print("🔍 REGISTERING DEBUG HANDLER")
         app.add_handler(TypeHandler(object, debug_update_handler), group=0)  # Highest priority
+        print("🔍 DEBUG HANDLER REGISTERED")
+
+        # Also add a specific callback query handler for debugging
+        async def debug_callback_handler(update, context):
+            print(f"🔍 SPECIFIC CALLBACK HANDLER: {update.callback_query.data if update.callback_query else 'NO DATA'}")
+            return False
+
+        print("🔍 REGISTERING SPECIFIC CALLBACK HANDLER")
+        app.add_handler(CallbackQueryHandler(debug_callback_handler), group=1)
+        print("🔍 SPECIFIC CALLBACK HANDLER REGISTERED")
 
         # Message handler for general messages
         app.add_handler(
