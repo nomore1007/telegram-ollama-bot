@@ -105,6 +105,26 @@ class TelegramOllamaBot:
         plugin_manager.load_plugin("web_search", WebSearchPlugin, plugin_configs.get('web_search', {}))
         plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
 
+        # Filter enabled plugins based on configuration requirements
+        filtered_plugins = []
+        for plugin_name in enabled_plugins:
+            if plugin_name == 'telegram':
+                config = plugin_configs.get('telegram', {})
+                if not config.get('bot_token') or config.get('bot_token', '').startswith('YOUR_'):
+                    logger.warning(f"Telegram plugin disabled: bot_token not configured")
+                    continue
+            elif plugin_name == 'discord':
+                config = plugin_configs.get('discord', {})
+                if not config.get('bot_token'):
+                    logger.warning(f"Discord plugin disabled: bot_token not configured")
+                    continue
+            # Web search doesn't require tokens
+            filtered_plugins.append(plugin_name)
+
+        # Enable only plugins with valid configuration
+        for plugin_name in filtered_plugins:
+            plugin_manager.enable_plugin(plugin_name)
+
         # Enable configured plugins
         for plugin_name in enabled_plugins:
             if plugin_name.strip() in plugin_manager.plugins:
