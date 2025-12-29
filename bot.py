@@ -34,15 +34,32 @@ from security import InputValidator, RateLimiter
 from admin import AdminManager
 from personality import Personality, personality_manager
 from plugins import plugin_manager
-from plugins.telegram_plugin import TelegramPlugin
-from plugins.web_search_plugin import WebSearchPlugin
-from plugins.discord_plugin import DiscordPlugin
-from plugins.weather_plugin import WeatherPlugin
-from plugins.calculator_plugin import CalculatorPlugin
-from plugins.currency_plugin import CurrencyPlugin
-from plugins.translation_plugin import TranslationPlugin
-from plugins.trivia_plugin import TriviaPlugin
-from plugins.url_shortener_plugin import URLShortenerPlugin
+
+# Import plugins with graceful error handling
+def safe_import_plugin(module_name, class_name):
+    """Safely import a plugin class, returning None if import fails"""
+    try:
+        module = __import__(f'plugins.{module_name}', fromlist=[class_name])
+        plugin_class = getattr(module, class_name)
+        logger.info(f"Successfully imported plugin: {module_name}")
+        return plugin_class
+    except ImportError as e:
+        logger.warning(f"Failed to import plugin {module_name}: {e}. Skipping this plugin.")
+        return None
+    except Exception as e:
+        logger.error(f"Error importing plugin {module_name}: {e}. Skipping this plugin.")
+        return None
+
+# Import plugins safely - bot will continue even if some plugins fail to load
+TelegramPlugin = safe_import_plugin('telegram_plugin', 'TelegramPlugin')
+WebSearchPlugin = safe_import_plugin('web_search_plugin', 'WebSearchPlugin')
+DiscordPlugin = safe_import_plugin('discord_plugin', 'DiscordPlugin')
+WeatherPlugin = safe_import_plugin('weather_plugin', 'WeatherPlugin')
+CalculatorPlugin = safe_import_plugin('calculator_plugin', 'CalculatorPlugin')
+CurrencyPlugin = safe_import_plugin('currency_plugin', 'CurrencyPlugin')
+TranslationPlugin = safe_import_plugin('translation_plugin', 'TranslationPlugin')
+TriviaPlugin = safe_import_plugin('trivia_plugin', 'TriviaPlugin')
+URLShortenerPlugin = safe_import_plugin('url_shortener_plugin', 'URLShortenerPlugin')
 from database import ChannelSettings
 
 
@@ -198,21 +215,35 @@ class TelegramOllamaBot:
         """Load and initialize plugins."""
         enabled_plugins = getattr(self.config, 'ENABLED_PLUGINS', [])
 
-        # Load available plugins with their configs
+        # Load available plugins with their configs (only if import succeeded)
         plugin_configs = getattr(self.config, 'PLUGINS', {})
-        plugin_manager.load_plugin("telegram", TelegramPlugin, plugin_configs.get('telegram', {}))
-        plugin_manager.load_plugin("web_search", WebSearchPlugin, plugin_configs.get('web_search', {}))
-        plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
-        plugin_manager.load_plugin("weather", WeatherPlugin, plugin_configs.get('weather', {}))
-        plugin_manager.load_plugin("calculator", CalculatorPlugin, plugin_configs.get('calculator', {}))
-        plugin_manager.load_plugin("currency", CurrencyPlugin, plugin_configs.get('currency', {}))
-        plugin_manager.load_plugin("translation", TranslationPlugin, plugin_configs.get('translation', {}))
-        plugin_manager.load_plugin("trivia", TriviaPlugin, plugin_configs.get('trivia', {}))
-        plugin_manager.load_plugin("url_shortener", URLShortenerPlugin, plugin_configs.get('url_shortener', {}))
+        if TelegramPlugin:
+            plugin_manager.load_plugin("telegram", TelegramPlugin, plugin_configs.get('telegram', {}))
+        if WebSearchPlugin:
+            plugin_manager.load_plugin("web_search", WebSearchPlugin, plugin_configs.get('web_search', {}))
+        if DiscordPlugin:
+            plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
+        if WeatherPlugin:
+            plugin_manager.load_plugin("weather", WeatherPlugin, plugin_configs.get('weather', {}))
+        if CalculatorPlugin:
+            plugin_manager.load_plugin("calculator", CalculatorPlugin, plugin_configs.get('calculator', {}))
+        if CurrencyPlugin:
+            plugin_manager.load_plugin("currency", CurrencyPlugin, plugin_configs.get('currency', {}))
+        if TranslationPlugin:
+            plugin_manager.load_plugin("translation", TranslationPlugin, plugin_configs.get('translation', {}))
+        if TriviaPlugin:
+            plugin_manager.load_plugin("trivia", TriviaPlugin, plugin_configs.get('trivia', {}))
+        if URLShortenerPlugin:
+            plugin_manager.load_plugin("url_shortener", URLShortenerPlugin, plugin_configs.get('url_shortener', {}))
 
         # Filter enabled plugins based on configuration requirements
+        # Only include plugins that were successfully imported and loaded
         filtered_plugins = []
         for plugin_name in enabled_plugins:
+            if plugin_name not in plugin_manager.plugins:
+                logger.warning(f"Skipping plugin '{plugin_name}' - not loaded (import failed)")
+                continue
+
             if plugin_name == 'telegram':
                 config = plugin_configs.get('telegram', {})
                 bot_token = config.get('bot_token') if config else getattr(self.config, 'TELEGRAM_BOT_TOKEN', None)
