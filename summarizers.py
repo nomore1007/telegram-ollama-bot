@@ -9,6 +9,7 @@ from newspaper import Article
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import pytube
 import aiohttp
+import json
 
 from constants import (
     ARTICLE_MAX_TEXT_LENGTH, TRANSCRIPT_MAX_LENGTH,
@@ -464,9 +465,13 @@ class YouTubeSummarizer:
         return None
 
     async def get_video_info(self, video_id: str) -> dict:
-        """Get video information using pytube"""
+        """Get video information using multiple fallback methods"""
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        # Method 1: Try pytube first
         try:
-            youtube = pytube.YouTube(f"https://www.youtube.com/watch?v={video_id}")
+            logger.debug(f"Trying pytube for video {video_id}")
+            youtube = pytube.YouTube(url)
 
             # SECURITY: Add timeout protection
             await asyncio.wait_for(
@@ -482,11 +487,184 @@ class YouTubeSummarizer:
                 "views": youtube.views,
                 "publish_date": youtube.publish_date,
                 "description": youtube.description[:500] if youtube.description else "",
-                "url": f"https://www.youtube.com/watch?v={video_id}"
+                "url": url,
+                "method": "pytube"
             }
         except Exception as e:
-            logger.error(f"Error getting video info for {video_id}: {type(e).__name__}")
-            return {"success": False, "error": "Failed to retrieve video information"}
+            logger.warning(f"Pytube failed for {video_id}: {type(e).__name__}, trying fallbacks")
+
+        # Method 2: Try yt-dlp if available
+        try:
+            logger.debug(f"Trying yt-dlp fallback for video {video_id}")
+            result = await self._extract_with_yt_dlp(video_id)
+            if result["success"]:
+                return result
+        except Exception as e:
+            logger.warning(f"yt-dlp fallback failed for {video_id}: {type(e).__name__}")
+
+        # Method 3: Try YouTube Data API if key available
+        try:
+            logger.debug(f"Trying YouTube API fallback for video {video_id}")
+            result = await self._extract_with_youtube_api(video_id)
+            if result["success"]:
+                return result
+        except Exception as e:
+            logger.warning(f"YouTube API fallback failed for {video_id}: {type(e).__name__}")
+
+        # Method 4: Try basic HTML scraping
+        try:
+            logger.debug(f"Trying HTML scraping fallback for video {video_id}")
+            result = await self._extract_with_html_scraping(video_id)
+            if result["success"]:
+                return result
+        except Exception as e:
+            logger.warning(f"HTML scraping fallback failed for {video_id}: {type(e).__name__}")
+
+        logger.error(f"All video info extraction methods failed for {video_id}")
+        return {"success": False, "error": "Failed to retrieve video information from all sources"}
+
+    async def _extract_with_yt_dlp(self, video_id: str) -> dict:
+        """Try to extract video info using yt-dlp (more reliable than pytube)"""
+        try:
+            import subprocess
+            import json
+
+            # Run yt-dlp to get video info
+            cmd = [
+                "yt-dlp",
+                "--no-warnings",
+                "--no-playlist",
+                "--print-json",
+                "--skip-download",
+                f"https://www.youtube.com/watch?v={video_id}"
+            ]
+
+            result = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+
+            if result.returncode == 0 and stdout:
+                data = json.loads(stdout.decode())
+                return {
+                    "success": True,
+                    "title": data.get("title", "Unknown Title"),
+                    "author": data.get("uploader", "Unknown Author"),
+                    "length": data.get("duration", 0),
+                    "views": data.get("view_count", 0),
+                    "publish_date": data.get("upload_date"),
+                    "description": data.get("description", "")[:500],
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                    "method": "yt-dlp"
+                }
+        except (ImportError, FileNotFoundError):
+            logger.debug("yt-dlp not available")
+        except Exception as e:
+            logger.error(f"yt-dlp extraction failed: {type(e).__name__}")
+
+        return {"success": False, "error": "yt-dlp extraction failed"}
+
+    async def _extract_with_youtube_api(self, video_id: str) -> dict:
+        """Try to extract video info using YouTube Data API v3"""
+        try:
+            # Check if we have an API key configured
+            api_key = getattr(self, '_youtube_api_key', None)
+            if not api_key:
+                return {"success": False, "error": "YouTube API key not configured"}
+
+            api_url = f"https://www.googleapis.com/youtube/v3/videos"
+            params = {
+                "part": "snippet,statistics,contentDetails",
+                "id": video_id,
+                "key": api_key
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("items"):
+                            video = data["items"][0]
+                            snippet = video.get("snippet", {})
+                            statistics = video.get("statistics", {})
+                            content_details = video.get("contentDetails", {})
+
+                            return {
+                                "success": True,
+                                "title": snippet.get("title", "Unknown Title"),
+                                "author": snippet.get("channelTitle", "Unknown Author"),
+                                "length": self._parse_duration(content_details.get("duration", "PT0S")),
+                                "views": int(statistics.get("viewCount", 0)),
+                                "publish_date": snippet.get("publishedAt"),
+                                "description": snippet.get("description", "")[:500],
+                                "url": f"https://www.youtube.com/watch?v={video_id}",
+                                "method": "youtube_api"
+                            }
+        except Exception as e:
+            logger.error(f"YouTube API extraction failed: {type(e).__name__}")
+
+        return {"success": False, "error": "YouTube API extraction failed"}
+
+    async def _extract_with_html_scraping(self, video_id: str) -> dict:
+        """Try to extract basic video info from YouTube HTML"""
+        try:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(url, timeout=15) as response:
+                    if response.status == 200:
+                        html = await response.text()
+
+                        # Extract title from HTML
+                        title = "Unknown Title"
+                        title_match = re.search(r'<title>([^<]+)</title>', html)
+                        if title_match:
+                            title = title_match.group(1).replace(" - YouTube", "").strip()
+
+                        # Extract author/channel
+                        author = "Unknown Author"
+                        author_match = re.search(r'"author":"([^"]+)"', html)
+                        if author_match:
+                            author = author_match.group(1)
+
+                        # Extract view count
+                        views = 0
+                        view_match = re.search(r'"viewCount":"(\d+)"', html)
+                        if view_match:
+                            views = int(view_match.group(1))
+
+                        return {
+                            "success": True,
+                            "title": title,
+                            "author": author,
+                            "length": 0,  # Can't easily extract from HTML
+                            "views": views,
+                            "publish_date": None,
+                            "description": "",
+                            "url": url,
+                            "method": "html_scraping"
+                        }
+        except Exception as e:
+            logger.error(f"HTML scraping extraction failed: {type(e).__name__}")
+
+        return {"success": False, "error": "HTML scraping extraction failed"}
+
+    def _parse_duration(self, duration: str) -> int:
+        """Parse ISO 8601 duration to seconds"""
+        import re
+        pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
+        match = re.match(pattern, duration)
+        if match:
+            hours = int(match.group(1) or 0)
+            minutes = int(match.group(2) or 0)
+            seconds = int(match.group(3) or 0)
+            return hours * 3600 + minutes * 60 + seconds
+        return 0
 
     async def get_transcript(self, video_id: str) -> dict:
         """Get transcript for YouTube video"""
@@ -605,10 +783,18 @@ Keep it informative and well-structured."""
         views = f"{video_info['views']:,}" if video_info.get("views") else "Unknown"
         length = f"{video_info.get('length', 0)//60}:{video_info.get('length', 0)%60:02d}" if video_info.get('length') else "Unknown"
 
+        # Add extraction method info if not standard
+        method_info = ""
+        extraction_method = video_info.get("method", "pytube")
+        if extraction_method != "pytube":
+            method_info = f"🔧 *Extraction:* {extraction_method}\n"
+
         response = f"🎬 *{title}*\n\n"
         response += f"👤 *Channel:* {author}\n"
         response += f"👁️ *Views:* {views}\n"
         response += f"⏱️ *Duration:* {length}\n"
+        if method_info:
+            response += method_info
         response += f"🔗 *Video:* [Watch Now]({url})\n\n"
 
         # Add transcript availability info
