@@ -9,7 +9,7 @@ import os
 # Load settings using the settings manager
 from settings_manager import settings_manager, settings, config
 
-print("🔍 BOT MODULE LOADED - Settings imported")
+
 
 from telegram import Update, BotCommand
 from telegram.ext import (
@@ -411,16 +411,13 @@ class TelegramOllamaBot:
         """
         Runs the bot.
         """
-        print("🔍 BOT STARTING - Telegram Ollama Bot")
         telegram_config = self.config.PLUGINS.get('telegram', {})
         bot_token = telegram_config.get('bot_token')
         if not bot_token:
             raise ValueError("Telegram bot token not configured in PLUGINS['telegram']['bot_token']")
-        print(f"🔍 Bot token configured: {bool(bot_token)}")
         app_builder = Application.builder().token(bot_token)
         app_builder.post_init(self.post_init)
         app = app_builder.build()
-        print("🔍 Telegram app created")
 
         # Command handlers from plugins
         for plugin in plugin_manager.get_enabled_plugins():
@@ -434,92 +431,24 @@ class TelegramOllamaBot:
 
         # Callback query handlers from plugins
         telegram_plugin = plugin_manager.plugins.get("telegram")
-        print(f"🔍 DEBUG: Telegram plugin found: {telegram_plugin is not None}")
-        print(f"🔍 DEBUG: Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
         logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
         logger.info(f"Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
         if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
-            print("🔍 DEBUG: Registering callback handlers...")
             logger.info("Registering callback handlers...")
 
-            # Create the handlers
-            model_handler = CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
-            menu_handler = CallbackQueryHandler(telegram_plugin.handle_menu_callback)
+            app.add_handler(
+                CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
+            )
+            app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
 
-            print(f"🔍 DEBUG: Created handlers - model: {model_handler}, menu: {menu_handler}")
-
-            # Add them to the app
-            try:
-                app.add_handler(model_handler)
-                print("🔍 DEBUG: Model handler added successfully")
-            except Exception as e:
-                print(f"🔍 ERROR adding model handler: {e}")
-                import traceback
-                print(f"🔍 TRACEBACK: {traceback.format_exc()}")
-
-            try:
-                app.add_handler(menu_handler)
-                print("🔍 DEBUG: Menu handler added successfully")
-            except Exception as e:
-                print(f"🔍 ERROR adding menu handler: {e}")
-                import traceback
-                print(f"🔍 TRACEBACK: {traceback.format_exc()}")
-
-            print("🔍 DEBUG: Callback handlers registered with Telegram app")
-            print(f"🔍 DEBUG: App handlers structure: {type(app.handlers)}")
-            try:
-                handler_count = len(app.handlers) if hasattr(app.handlers, '__len__') else 'unknown'
-                print(f"🔍 DEBUG: App has {handler_count} handler groups")
-            except:
-                print("🔍 DEBUG: Could not count handler groups")
             logger.info("Callback handlers registered")
-
-            # Add a catch-all callback handler for debugging
-            async def debug_callback_handler(update, context):
-                print(f"🔍 CATCH-ALL CALLBACK: {update.callback_query.data if update.callback_query else 'NO DATA'}")
-                return False  # Don't consume the event
-
-            debug_handler = CallbackQueryHandler(debug_callback_handler)
-            app.add_handler(debug_handler, group=999)  # High group number so it runs after others
-            print("🔍 DEBUG: Added catch-all callback handler")
         else:
             print("🔍 DEBUG: ERROR - Telegram plugin not found or not enabled!")
             logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
         # Legacy callback handlers removed - using plugin system
 
-        # Debug handler for all updates (highest priority)
-        async def debug_update_handler(update, context):
-            print(f"🔍 DEBUG HANDLER CALLED: {type(update).__name__}")
-            print(f"🔍 UPDATE RECEIVED: {type(update).__name__}")
-            if hasattr(update, 'update_id'):
-                print(f"🔍 UPDATE ID: {update.update_id}")
-            if hasattr(update, 'message') and update.message:
-                print(f"🔍 MESSAGE: {update.message.text if hasattr(update.message, 'text') else 'NO TEXT'}")
-            if hasattr(update, 'callback_query') and update.callback_query:
-                print(f"🔍 CALLBACK QUERY: {update.callback_query.data}")
-                print(f"🔍 CALLBACK ID: {update.callback_query.id}")
-                print(f"🔍 CALLBACK FROM: {update.callback_query.from_user.username if update.callback_query.from_user else 'UNKNOWN'}")
-                # Answer the callback to prevent timeout
-                try:
-                    await update.callback_query.answer()
-                    print("🔍 CALLBACK ANSWERED")
-                except Exception as e:
-                    print(f"🔍 ERROR ANSWERING CALLBACK: {e}")
-            return False  # Don't consume the update
 
-        print("🔍 REGISTERING DEBUG HANDLER")
-        app.add_handler(TypeHandler(object, debug_update_handler), group=0)  # Highest priority
-        print("🔍 DEBUG HANDLER REGISTERED")
-
-        # Also add a specific callback query handler for debugging
-        async def debug_callback_handler(update, context):
-            print(f"🔍 SPECIFIC CALLBACK HANDLER: {update.callback_query.data if update.callback_query else 'NO DATA'}")
-            return False
-
-        print("🔍 REGISTERING SPECIFIC CALLBACK HANDLER")
-        app.add_handler(CallbackQueryHandler(debug_callback_handler), group=1)
-        print("🔍 SPECIFIC CALLBACK HANDLER REGISTERED")
 
         # Message handler for general messages
         app.add_handler(
@@ -528,9 +457,7 @@ class TelegramOllamaBot:
 
         # Start the bot
         logger.info("Starting Telegram Ollama bot")
-        print("🔍 STARTING POLLING...")
-        app.run_polling(allowed_updates=["message", "callback_query"])
-        print("🔍 POLLING STARTED")
+        app.run_polling()
 
     def run_discord_bot(self):
         """Run Discord bot if enabled."""
@@ -556,7 +483,6 @@ OllamaClient = LLMClient  # For backward compatibility with tests
 # -------------------------------------------------------------------
 
 def main():
-    print("🔍 MAIN FUNCTION STARTED")
     bot = TelegramOllamaBot(settings)
 
     # Run Discord bot in background if enabled

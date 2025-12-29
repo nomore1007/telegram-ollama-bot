@@ -116,7 +116,6 @@ class TelegramPlugin(Plugin):
     async def handle_start(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         if update.message:
-            print("🔍 SENDING START MENU")
             keyboard = [
                 [InlineKeyboardButton("💬 Chat", callback_data="chat")],
                 [InlineKeyboardButton("📰 News Summarizer", callback_data="news")],
@@ -124,14 +123,12 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("⚙️ Model Settings", callback_data="model")],
                 [InlineKeyboardButton("❓ Help", callback_data="help")],
             ]
-            print(f"🔍 START KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
             await update.message.reply_text(
                 f"🤖 *Welcome to {self.bot.bot_username or 'Deepthought Bot'}!*\n\n"
                 "Choose an option below:",
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
-            print("🔍 START MENU SENT")
 
     async def handle_help(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
@@ -163,7 +160,6 @@ class TelegramPlugin(Plugin):
     async def handle_menu(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /menu command - show model management menu"""
         if update.message:
-            print("🔍 SENDING MODEL MENU")
             keyboard = [
                 [InlineKeyboardButton("🧠 Model Info", callback_data="model_info")],
                 [InlineKeyboardButton("📋 List Models", callback_data="list_models")],
@@ -171,21 +167,12 @@ class TelegramPlugin(Plugin):
                 [InlineKeyboardButton("💬 Set Prompt", callback_data="set_prompt")],
                 [InlineKeyboardButton("🌐 Set Provider", callback_data="set_provider")],
                 [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
-                [InlineKeyboardButton("🔍 TEST BUTTON", callback_data="test_callback")],  # Simple test button
             ]
-            print(f"🔍 MENU KEYBOARD: {[btn.callback_data for row in keyboard for btn in row]}")
-
-            # Create the markup
-            markup = InlineKeyboardMarkup(keyboard)
-            print(f"🔍 INLINE KEYBOARD CREATED: {markup}")
-
-            result = await update.message.reply_text(
+            await update.message.reply_text(
                 "🤖 *Bot Menu*\n\nChoose an option:",
-                reply_markup=markup,
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
-            print(f"🔍 MESSAGE SENT RESULT: {result}")
-            print("🔍 MODEL MENU SENT")
 
     async def handle_model(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /model command"""
@@ -471,22 +458,11 @@ class TelegramPlugin(Plugin):
 
     async def handle_menu_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle menu callbacks"""
-        print(f"🔍 MENU CALLBACK RECEIVED: {update.callback_query.data if update.callback_query else 'NO QUERY'}")
-        logger.info(f"=== MENU CALLBACK RECEIVED ===")
-        logger.info(f"Update: {update}")
-        logger.info(f"Callback query: {update.callback_query}")
-
         query = update.callback_query
         if not query:
-            print("🔍 ERROR: No callback query found!")
-            logger.error("No callback query found!")
             return
 
-        print(f"🔍 Processing callback data: {query.data}")
-        logger.info(f"Callback data: {query.data}")
         await query.answer()
-        print("🔍 Query answered")
-        logger.info("Query answered")
 
         try:
             if not query.data:
@@ -660,22 +636,11 @@ class TelegramPlugin(Plugin):
     @require_admin
     async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle model selection callbacks"""
-        print(f"🔍 MODEL CALLBACK RECEIVED: {update.callback_query.data if update.callback_query else 'NO QUERY'}")
-        logger.info(f"=== MODEL CALLBACK RECEIVED ===")
-        logger.info(f"Update: {update}")
-        logger.info(f"Callback query: {update.callback_query}")
-
         query = update.callback_query
         if not query:
-            print("🔍 ERROR: No callback query found!")
-            logger.error("No callback query found!")
             return
 
-        print(f"🔍 Processing model callback data: {query.data}")
-        logger.info(f"Callback data: {query.data}")
         await query.answer()
-        print("🔍 Model query answered")
-        logger.info("Query answered")
 
         try:
             if not query.data:
