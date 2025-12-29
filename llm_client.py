@@ -359,8 +359,6 @@ class LLMClient:
     """Multi-provider LLM client"""
 
     def __init__(self, provider_or_host: str = "ollama", model: Optional[str] = None, timeout: int = 30, **kwargs):
-        logger.info(f"LLMClient init: provider_or_host={provider_or_host}, model={model}, kwargs={kwargs}")
-
         # Backward compatibility: if provider_or_host looks like a URL, treat as Ollama host
         if provider_or_host.startswith("http"):
             # Old OllamaClient signature
@@ -372,19 +370,15 @@ class LLMClient:
             self.provider_name = provider_or_host
             # Remove provider from kwargs if it exists to avoid conflict
             provider_kwargs = {k: v for k, v in kwargs.items() if k != 'provider'}
-            logger.info(f"Creating provider {provider_or_host} with kwargs: {provider_kwargs}")
             self.provider = self._create_provider(provider_or_host, model=model, timeout=timeout, **provider_kwargs)
             self.model = kwargs.get('model', model or 'llama2')
 
     def _create_provider(self, provider: str, **kwargs) -> LLMProvider:
         """Create provider instance"""
         if provider == "ollama":
-            host = kwargs.get('host', 'http://localhost:11434')
-            timeout = kwargs.get('timeout', 30)
-            logger.info(f"Creating OllamaProvider with host={host}, timeout={timeout}")
             return OllamaProvider(
-                host=host,
-                timeout=timeout
+                host=kwargs.get('host', 'http://localhost:11434'),
+                timeout=kwargs.get('timeout', 30)
             )
         elif provider == "openai":
             api_key = kwargs.get('api_key')
