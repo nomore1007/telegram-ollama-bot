@@ -22,15 +22,21 @@ class InputValidator:
         r'<\w+[^>]*\bon\w+[^>]*>',    # HTML with event handlers
     ]
 
-    # Suspicious keywords
+    # Suspicious keywords (for code/command input)
     SUSPICIOUS_KEYWORDS = [
         'eval', 'exec', 'system', 'subprocess', 'os.', 'import os',
         'rm ', 'del ', 'format ', 'delete', 'drop table', 'union select'
     ]
 
+    # Less suspicious keywords that are OK in URLs
+    URL_SUSPICIOUS_KEYWORDS = [
+        'eval', 'exec', 'system', 'import', 'delete'
+    ]
+
     def __init__(self):
         self.dangerous_regex = re.compile('|'.join(self.DANGEROUS_PATTERNS), re.IGNORECASE)
         self.suspicious_regex = re.compile('|'.join(self.SUSPICIOUS_KEYWORDS), re.IGNORECASE)
+        self.url_suspicious_regex = re.compile('|'.join(self.URL_SUSPICIOUS_KEYWORDS), re.IGNORECASE)
 
     def validate_text(self, text: str, max_length: int = 10000) -> Tuple[bool, str]:
         """Validate and sanitize text input"""
@@ -45,12 +51,55 @@ class InputValidator:
             logger.warning("Dangerous pattern detected in input")
             return False, "Input contains potentially dangerous content"
 
-        # Check for suspicious keywords
-        if self.suspicious_regex.search(text):
+        # Check for suspicious content (context-aware)
+        if self._contains_suspicious_content(text):
             logger.warning("Suspicious keywords detected in input")
             return False, "Input contains suspicious content"
 
         return True, text.strip()
+
+    def _contains_suspicious_content(self, text: str) -> bool:
+        """Check for suspicious content, with context-aware validation"""
+        # Extract URLs from text
+        url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        urls = url_pattern.findall(text)
+
+        # Remove URLs from text for keyword checking
+        text_without_urls = url_pattern.sub('', text)
+
+        # Check non-URL content with strict rules
+        if self.suspicious_regex.search(text_without_urls):
+            return True
+
+        # Check URLs with relaxed rules (only most dangerous keywords)
+        for url in urls:
+            if self.url_suspicious_regex.search(url):
+                # Allow if it's just a parameter value, not the main path
+                if not self._is_suspicious_url_structure(url):
+                    continue
+                return True
+
+        return False
+
+    def _is_suspicious_url_structure(self, url: str) -> bool:
+        """Check if URL structure suggests actual malicious intent"""
+        # Allow keywords in query parameters (e.g., ?action=eval)
+        # But flag them in paths (e.g., /eval/script.php)
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+
+            # Check if suspicious keywords are in the path (more concerning)
+            path_keywords = ['eval', 'exec', 'system', 'delete']
+            for keyword in path_keywords:
+                if keyword in parsed.path.lower():
+                    return True
+
+            # Less concerning if only in query/fragment
+            return False
+        except:
+            # If parsing fails, be conservative and allow
+            return False
 
     def validate_url(self, url: str) -> Tuple[bool, str]:
         """Validate URL for safety"""
