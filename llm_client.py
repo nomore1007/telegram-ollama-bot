@@ -377,7 +377,7 @@ class LLMClient:
         """Create provider instance"""
         if provider == "ollama":
             host = kwargs.get('host', 'http://localhost:11434')
-            logger.debug(f"Creating Ollama provider with host: {host}")
+            logger.info(f"Creating Ollama provider with host: {host}")
             return OllamaProvider(
                 host=host,
                 timeout=kwargs.get('timeout', 30)

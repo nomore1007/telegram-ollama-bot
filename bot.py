@@ -544,7 +544,11 @@ class TelegramOllamaBot:
             channel_prompt = self.get_channel_setting(channel_id_str, 'prompt') or self.custom_prompt
             channel_provider = self.get_channel_setting(channel_id_str, 'provider') or 'ollama'  # Default to ollama
             channel_host = self.get_channel_setting(channel_id_str, 'host') if channel_provider == 'ollama' else None
-            logger.debug(f"Channel {channel_id_str}: provider={channel_provider}, host={channel_host}")
+
+            # Debug: Check what get_channel_setting returns
+            raw_provider = self.get_channel_setting(channel_id_str, 'provider')
+            raw_host = self.get_channel_setting(channel_id_str, 'host')
+            logger.info(f"Channel {channel_id_str}: raw_provider={raw_provider}, raw_host={raw_host}, final_provider={channel_provider}, final_host={channel_host}")
 
 
 
