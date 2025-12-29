@@ -345,24 +345,65 @@ class TelegramOllamaBot:
             youtube_urls = self.youtube_summarizer.extract_video_urls(message_text)
 
             if youtube_urls:
-                await update.message.reply_text("🎬 *YouTube video detected! Summarizing...*", parse_mode="Markdown")
+                try:
+                    await update.message.reply_text("🎬 *YouTube video detected! Summarizing...*", parse_mode="Markdown")
+                except Exception as e:
+                    logger.warning(f"Failed to send YouTube detection message: {type(e).__name__}")
+                    return
 
                 for url in youtube_urls[:MAX_VIDEOS_PER_MESSAGE]:  # Limit videos per message
                     try:
-                        await update.message.reply_text("⏳ Processing video...")
-                        summary = await self.youtube_summarizer.process_video(url)
+                        # Send processing message with timeout protection
+                        try:
+                            await asyncio.wait_for(
+                                update.message.reply_text("⏳ Processing video..."),
+                                timeout=5.0
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning("Timeout sending video processing message")
+                            continue
+                        except Exception as e:
+                            logger.warning(f"Failed to send video processing message: {type(e).__name__}")
+                            continue
 
-                        # Split long summaries
-                        if len(summary) > MAX_MESSAGE_LENGTH:
-                            parts = [summary[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
-                            for i, part in enumerate(parts):
-                                await update.message.reply_text(part, parse_mode="Markdown", disable_web_page_preview=i>0)
-                        else:
-                            await update.message.reply_text(summary, parse_mode="Markdown")
+                        # Process video with timeout
+                        try:
+                            summary = await asyncio.wait_for(
+                                self.youtube_summarizer.process_video(url),
+                                timeout=120.0  # 2 minutes for video processing
+                            )
+                        except asyncio.TimeoutError:
+                            await update.message.reply_text("⏳ Video processing timed out. Please try again.")
+                            continue
+
+                        # Send summary with timeout protection
+                        try:
+                            if len(summary) > MAX_MESSAGE_LENGTH:
+                                parts = [summary[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
+                                for i, part in enumerate(parts):
+                                    await asyncio.wait_for(
+                                        update.message.reply_text(part, parse_mode="Markdown", disable_web_page_preview=i>0),
+                                        timeout=10.0
+                                    )
+                            else:
+                                await asyncio.wait_for(
+                                    update.message.reply_text(summary, parse_mode="Markdown"),
+                                    timeout=10.0
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning("Timeout sending video summary")
+                        except Exception as e:
+                            logger.warning(f"Failed to send video summary: {type(e).__name__}")
 
                     except Exception as e:
                         logger.error(f"Error processing video {url}: {type(e).__name__}")
-                        await update.message.reply_text(f"❌ Failed to process video. Please try again later.")
+                        try:
+                            await asyncio.wait_for(
+                                update.message.reply_text("❌ Failed to process video. Please try again later."),
+                                timeout=5.0
+                            )
+                        except:
+                            logger.warning("Failed to send video error message")
 
                 return
 
@@ -370,20 +411,67 @@ class TelegramOllamaBot:
             news_urls = self.news_summarizer.extract_urls(message_text)
 
             if news_urls:
-                await update.message.reply_text("📰 *News article detected! Summarizing...*", parse_mode="Markdown")
+                try:
+                    await asyncio.wait_for(
+                        update.message.reply_text("📰 *News article detected! Summarizing...*", parse_mode="Markdown"),
+                        timeout=5.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout sending article detection message")
+                    return
+                except Exception as e:
+                    logger.warning(f"Failed to send article detection message: {type(e).__name__}")
+                    return
 
                 for url in news_urls[:MAX_ARTICLES_PER_MESSAGE]:  # Limit articles per message
                     try:
-                        await update.message.reply_text("⏳ Processing article...")
-                        summary = await self.news_summarizer.process_article(url)
+                        # Send processing message with timeout protection
+                        try:
+                            await asyncio.wait_for(
+                                update.message.reply_text("⏳ Processing article..."),
+                                timeout=5.0
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning("Timeout sending article processing message")
+                            continue
+                        except Exception as e:
+                            logger.warning(f"Failed to send article processing message: {type(e).__name__}")
+                            continue
 
-                        # Split long summaries
-                        if len(summary) > MAX_MESSAGE_LENGTH:
-                            parts = [summary[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
-                            for i, part in enumerate(parts):
-                                await update.message.reply_text(part, parse_mode="Markdown", disable_web_page_preview=i>0)
-                        else:
-                            await update.message.reply_text(summary, parse_mode="Markdown")
+                        # Process article with timeout
+                        try:
+                            summary = await asyncio.wait_for(
+                                self.news_summarizer.process_article(url),
+                                timeout=90.0  # 90 seconds for article processing
+                            )
+                        except asyncio.TimeoutError:
+                            try:
+                                await asyncio.wait_for(
+                                    update.message.reply_text("⏳ Article processing timed out. Please try again."),
+                                    timeout=5.0
+                                )
+                            except:
+                                logger.warning("Failed to send article timeout message")
+                            continue
+
+                        # Send summary with timeout protection
+                        try:
+                            if len(summary) > MAX_MESSAGE_LENGTH:
+                                parts = [summary[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
+                                for i, part in enumerate(parts):
+                                    await asyncio.wait_for(
+                                        update.message.reply_text(part, parse_mode="Markdown", disable_web_page_preview=i>0),
+                                        timeout=10.0
+                                    )
+                            else:
+                                await asyncio.wait_for(
+                                    update.message.reply_text(summary, parse_mode="Markdown"),
+                                    timeout=10.0
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning("Timeout sending article summary")
+                        except Exception as e:
+                            logger.warning(f"Failed to send article summary: {type(e).__name__}")
 
                     except Exception as e:
                         logger.error(f"Error processing article {url}: {type(e).__name__}")
@@ -392,17 +480,46 @@ class TelegramOllamaBot:
                             article_data = await self.news_summarizer.extract_article_content(url)
                             if not article_data["success"]:
                                 error_msg = article_data.get("error", "Unknown error")
-                                await update.message.reply_text(f"❌ Failed to process article: {error_msg}")
+                                try:
+                                    await asyncio.wait_for(
+                                        update.message.reply_text(f"❌ Failed to process article: {error_msg}"),
+                                        timeout=5.0
+                                    )
+                                except:
+                                    logger.warning("Failed to send article error message")
                             else:
-                                await update.message.reply_text("❌ Failed to summarize article. Please try again later.")
-                        except:
-                            await update.message.reply_text("❌ Failed to process article. Please try again later.")
+                                try:
+                                    await asyncio.wait_for(
+                                        update.message.reply_text("❌ Failed to summarize article. Please try again later."),
+                                        timeout=5.0
+                                    )
+                                except:
+                                    logger.warning("Failed to send article summary error message")
+                        except Exception as inner_e:
+                            logger.error(f"Error getting article error details: {type(inner_e).__name__}")
+                            try:
+                                await asyncio.wait_for(
+                                    update.message.reply_text("❌ Failed to process article. Please try again later."),
+                                    timeout=5.0
+                                )
+                            except:
+                                logger.warning("Failed to send generic article error message")
 
                 return
 
             # Regular chat message with conversation context
-            # Send thinking message
-            thinking_message = await update.message.reply_text("🤔 Thinking…")
+            # Send thinking message with timeout protection
+            try:
+                thinking_message = await asyncio.wait_for(
+                    update.message.reply_text("🤔 Thinking…"),
+                    timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout sending thinking message")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to send thinking message: {type(e).__name__}")
+                return
 
             # Add user message to conversation history
             chat_id = update.message.chat.id
@@ -455,7 +572,34 @@ class TelegramOllamaBot:
             # Add assistant response to conversation history
             self.conversation_manager.add_assistant_message(chat_id, response)
 
-            await thinking_message.edit_text(response)
+            # Send response with timeout protection
+            try:
+                await asyncio.wait_for(
+                    thinking_message.edit_text(response),
+                    timeout=15.0  # 15 seconds for response
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout editing thinking message with response")
+                # Try to send as new message instead
+                try:
+                    await asyncio.wait_for(
+                        update.message.reply_text(response),
+                        timeout=15.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.error("Timeout sending response message")
+                except Exception as e:
+                    logger.error(f"Failed to send response message: {type(e).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to edit thinking message: {type(e).__name__}")
+                # Try to send as new message instead
+                try:
+                    await asyncio.wait_for(
+                        update.message.reply_text(response),
+                        timeout=15.0
+                    )
+                except Exception as inner_e:
+                    logger.error(f"Failed to send fallback response message: {type(inner_e).__name__}")
 
     # ---------------------------------------------------------------
 
