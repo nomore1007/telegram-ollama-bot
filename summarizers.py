@@ -669,63 +669,50 @@ class YouTubeSummarizer:
     async def get_transcript(self, video_id: str) -> dict:
         """Get transcript for YouTube video"""
         try:
-            # Try multiple transcript retrieval methods
-            transcript_data = None
+            # Use the correct YouTubeTranscriptApi API
+            yt_api = YouTubeTranscriptApi()
+            transcripts = yt_api.list(video_id)
 
-            # Method 1: Try direct get_transcript (most reliable)
-            try:
-                transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
-            except Exception:
-                try:
-                    # Try without language specification
-                    transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
-                except Exception:
-                    pass
+            # Find the best available transcript
+            transcript = None
+            transcripts_list = list(transcripts)
 
-            # Method 2: Try list_transcripts approach if direct method failed
-            if not transcript_data:
-                try:
-                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            if not transcripts_list:
+                return {"success": False, "error": "No transcripts available for this video"}
 
-                    # Try English first
-                    try:
-                        transcript = transcript_list.find_transcript(['en'])
-                        transcript_data = transcript.fetch()
-                    except Exception:
-                        # Try manually created transcripts
-                        try:
-                            transcript = transcript_list.find_manually_created_transcript()
-                            transcript_data = transcript.fetch()
-                        except Exception:
-                            # Try any available transcript
-                            try:
-                                transcripts = list(transcript_list)
-                                if transcripts:
-                                    transcript_data = transcripts[0].fetch()
-                            except Exception:
-                                pass
-                except Exception as e:
-                    logger.warning(f"Transcript list API failed: {type(e).__name__}")
+            # Prefer English manual transcripts, then English auto-generated, then any available
+            for t in transcripts_list:
+                if t.language_code.startswith('en'):
+                    if not t.is_generated:
+                        transcript = t  # Manual English transcript
+                        break
+                    elif transcript is None or not transcript.language_code.startswith('en'):
+                        transcript = t  # Auto-generated English transcript
+
+            # If no English transcript, use any available
+            if not transcript:
+                transcript = transcripts_list[0]
+
+            # Fetch the transcript data
+            transcript_data = transcript.fetch()
 
             if not transcript_data:
-                return {"success": False, "error": "No transcript available for this video"}
+                return {"success": False, "error": "Failed to fetch transcript data"}
 
             # Combine transcript text
-            full_text = " ".join([entry['text'] for entry in transcript_data])
+            full_text = " ".join([entry.text for entry in transcript_data])
 
             return {
                 "success": True,
                 "text": full_text,
-                "language": "en",
-                "is_generated": False,
-                "duration": sum([entry.get('duration', 0) for entry in transcript_data])
+                "language": transcript.language,
+                "is_generated": transcript.is_generated,
+                "duration": sum([entry.duration for entry in transcript_data])
             }
 
-        except (TranscriptsDisabled, NoTranscriptFound) as e:
-            return {"success": False, "error": "Transcript not available for this video"}
         except Exception as e:
             logger.error(f"Error getting transcript for {video_id}: {type(e).__name__}")
-            return {"success": False, "error": "Failed to retrieve video transcript"}
+            return {"success": False, "error": "Failed to retrieve transcript"}
 
     async def summarize_transcript(self, video_info: dict, transcript_data: dict) -> str:
         """Use AI to summarize video transcript"""
