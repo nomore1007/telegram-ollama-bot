@@ -35,6 +35,7 @@ from plugins import plugin_manager
 from plugins.telegram_plugin import TelegramPlugin
 from plugins.web_search_plugin import WebSearchPlugin
 from plugins.discord_plugin import DiscordPlugin
+from plugins.weather_plugin import WeatherPlugin
 from database import ChannelSettings
 
 
@@ -195,6 +196,7 @@ class TelegramOllamaBot:
         plugin_manager.load_plugin("telegram", TelegramPlugin, plugin_configs.get('telegram', {}))
         plugin_manager.load_plugin("web_search", WebSearchPlugin, plugin_configs.get('web_search', {}))
         plugin_manager.load_plugin("discord", DiscordPlugin, plugin_configs.get('discord', {}))
+        plugin_manager.load_plugin("weather", WeatherPlugin, plugin_configs.get('weather', {}))
 
         # Filter enabled plugins based on configuration requirements
         filtered_plugins = []
