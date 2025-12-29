@@ -469,17 +469,21 @@ class TelegramPlugin(Plugin):
 
     async def handle_menu_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle menu callbacks"""
+        print(f"🔍 MENU CALLBACK RECEIVED: {update.callback_query.data if update.callback_query else 'NO QUERY'}")
         logger.info(f"=== MENU CALLBACK RECEIVED ===")
         logger.info(f"Update: {update}")
         logger.info(f"Callback query: {update.callback_query}")
 
         query = update.callback_query
         if not query:
+            print("🔍 ERROR: No callback query found!")
             logger.error("No callback query found!")
             return
 
+        print(f"🔍 Processing callback data: {query.data}")
         logger.info(f"Callback data: {query.data}")
         await query.answer()
+        print("🔍 Query answered")
         logger.info("Query answered")
 
         try:
@@ -651,17 +655,21 @@ class TelegramPlugin(Plugin):
     @require_admin
     async def handle_model_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         """Handle model selection callbacks"""
+        print(f"🔍 MODEL CALLBACK RECEIVED: {update.callback_query.data if update.callback_query else 'NO QUERY'}")
         logger.info(f"=== MODEL CALLBACK RECEIVED ===")
         logger.info(f"Update: {update}")
         logger.info(f"Callback query: {update.callback_query}")
 
         query = update.callback_query
         if not query:
+            print("🔍 ERROR: No callback query found!")
             logger.error("No callback query found!")
             return
 
+        print(f"🔍 Processing model callback data: {query.data}")
         logger.info(f"Callback data: {query.data}")
         await query.answer()
+        print("🔍 Model query answered")
         logger.info("Query answered")
 
         try:

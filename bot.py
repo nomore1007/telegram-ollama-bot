@@ -408,13 +408,16 @@ class TelegramOllamaBot:
         """
         Runs the bot.
         """
+        print("🔍 BOT STARTING - Telegram Ollama Bot")
         telegram_config = self.config.PLUGINS.get('telegram', {})
         bot_token = telegram_config.get('bot_token')
         if not bot_token:
             raise ValueError("Telegram bot token not configured in PLUGINS['telegram']['bot_token']")
+        print(f"🔍 Bot token configured: {bool(bot_token)}")
         app_builder = Application.builder().token(bot_token)
         app_builder.post_init(self.post_init)
         app = app_builder.build()
+        print("🔍 Telegram app created")
 
         # Command handlers from plugins
         for plugin in plugin_manager.get_enabled_plugins():
@@ -428,16 +431,21 @@ class TelegramOllamaBot:
 
         # Callback query handlers from plugins
         telegram_plugin = plugin_manager.plugins.get("telegram")
+        print(f"🔍 DEBUG: Telegram plugin found: {telegram_plugin is not None}")
+        print(f"🔍 DEBUG: Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
         logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
         logger.info(f"Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
         if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
+            print("🔍 DEBUG: Registering callback handlers...")
             logger.info("Registering callback handlers...")
             app.add_handler(
                 CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
             )
             app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
+            print("🔍 DEBUG: Callback handlers registered")
             logger.info("Callback handlers registered")
         else:
+            print("🔍 DEBUG: ERROR - Telegram plugin not found or not enabled!")
             logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
         # Legacy callback handlers removed - using plugin system
