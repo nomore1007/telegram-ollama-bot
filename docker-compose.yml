@@ -24,7 +24,7 @@ services:
       - /opt/telegram-ollama-bot:/app/data # Bind mount for config files to /app/data inside container
 
     # Default command to run the bot, relative to the WORKDIR
-    command: /bin/bash # TEMPORARY: For network debugging. Revert to default after debugging.
+    # command: /bin/bash # TEMPORARY: For network debugging. Revert to default after debugging.
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
