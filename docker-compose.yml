@@ -9,18 +9,10 @@ services:
     container_name: deepthought-bot
     restart: unless-stopped
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - BOT_USERNAME=${BOT_USERNAME:-DeepthoughtBot}
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434} # Connects to external Ollama
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
-      - MAX_TOKENS=${MAX_TOKENS:-2000}
-      - TEMPERATURE=${TEMPERATURE:-0.7}
-      - TIMEOUT=${TIMEOUT:-30}
-      - DEFAULT_PROMPT=${DEFAULT_PROMPT}
-      - BOT_CONFIG_DIR=/app/data # Set the config directory inside the container
-      - BOT_APP_SOURCE_DIR=/app # Set the application source directory
+      - CONFIG_DIR=/app/data # Set the config directory inside the container
+      - APP_SOURCE_DIR=/app # Set the application source directory
     volumes:
-      - bot_logs:/app/logs
+      - /opt/telegram-ollama-bot/bot_logs:/app/logs
       - /opt/telegram-ollama-bot:/app/data # Bind mount for config files to /app/data inside container
 
     # Default command to run the bot, relative to the WORKDIR
