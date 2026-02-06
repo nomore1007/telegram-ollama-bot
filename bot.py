@@ -682,7 +682,7 @@ class TelegramOllamaBot:
         bot_token = telegram_config.get('bot_token')
 
         if self._is_valid_telegram_token(bot_token):
-            request = HTTPXRequest(connect_timeout=60.0, read_timeout=60.0)
+            request = HTTPXRequest(connect_timeout=120.0, read_timeout=120.0)
             app_builder = Application.builder().token(bot_token).request(request)
             app_builder.post_init(self.post_init)
             app = app_builder.build()
