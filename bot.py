@@ -682,7 +682,7 @@ class TelegramOllamaBot:
         bot_token = telegram_config.get('bot_token')
 
         if self._is_valid_telegram_token(bot_token):
-            app_builder = Application.builder().token(bot_token, request_kwargs={"local_address": "0.0.0.0"})
+            app_builder = Application.builder().token(bot_token).request_kwargs({"local_address": "0.0.0.0"})
             app_builder.post_init(self.post_init)
             app = app_builder.build()
             telegram_bot_active = True
