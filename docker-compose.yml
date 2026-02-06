@@ -20,7 +20,7 @@ services:
     networks:
       - bot-network
     volumes:
-      - ./logs:/app/logs
+      - bot_logs:/app/logs # Persists bot logs
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
@@ -42,7 +42,7 @@ services:
     environment:
       - OLLAMA_HOST=0.0.0.0
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_data:/root/.ollama # Persists Ollama models
     networks:
       - bot-network
     healthcheck:
@@ -58,6 +58,8 @@ services:
 
 volumes:
   ollama_data:
+    driver: local
+  bot_logs:
     driver: local
 
 networks:
