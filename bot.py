@@ -640,6 +640,14 @@ class TelegramOllamaBot:
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands set successfully.")
 
+    def _is_valid_telegram_token(self, token: Optional[str]) -> bool:
+        """Checks if a Telegram bot token is valid (not None, not empty, not a placeholder)."""
+        if not token:
+            return False
+        if isinstance(token, str) and (token.strip() == "" or token.startswith('YOUR_') and token.endswith('_HERE')):
+            return False
+        return True
+
     async def _test_initialize_and_run(self, app: Application):
         """Initializes the application for testing purposes and then runs the polling."""
         try:
@@ -659,51 +667,84 @@ class TelegramOllamaBot:
         """
         Runs the bot.
         """
+        telegram_bot_active = False
+        discord_bot_active = False
+        app = None # Initialize app to None
+
+        # --- Telegram Bot Setup ---
         telegram_config = self.config.PLUGINS.get('telegram', {})
         bot_token = telegram_config.get('bot_token')
-        if not bot_token:
-            raise ValueError("Telegram bot token not configured in PLUGINS['telegram']['bot_token']")
-        app_builder = Application.builder().token(bot_token)
-        app_builder.post_init(self.post_init)
-        app = app_builder.build()
 
-        # Command handlers from plugins
-        for plugin in plugin_manager.get_enabled_plugins():
-            for command in plugin.get_commands():
-                handler_method = getattr(plugin, f"handle_{command}", None)
-                if handler_method:
-                    # getattr on instance returns bound method, use directly
-                    app.add_handler(CommandHandler(command, handler_method))
+        if self._is_valid_telegram_token(bot_token):
+            app_builder = Application.builder().token(bot_token)
+            app_builder.post_init(self.post_init)
+            app = app_builder.build()
+            telegram_bot_active = True
+            logger.info("Telegram bot is configured and will attempt to start.")
 
-        # Callback query handlers from plugins
-        telegram_plugin = plugin_manager.plugins.get("telegram")
-        logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
-        logger.info(f"Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
-        if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
-            logger.info("Registering callback handlers...")
+            # Command handlers from plugins
+            for plugin in plugin_manager.get_enabled_plugins():
+                for command in plugin.get_commands():
+                    handler_method = getattr(plugin, f"handle_{command}", None)
+                    if handler_method:
+                        app.add_handler(CommandHandler(command, handler_method))
 
-            app.add_handler(
-                CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:")
-            )
-            app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
+            # Callback query handlers from plugins
+            telegram_plugin = plugin_manager.plugins.get("telegram")
+            logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
+            logger.info(f"Telegram plugin enabled: {plugin_manager.plugins.get('telegram') in plugin_manager.get_enabled_plugins()}")
+            if telegram_plugin and plugin_manager.plugins["telegram"] in plugin_manager.get_enabled_plugins():
+                logger.info("Registering callback handlers...")
+                app.add_handler(CallbackQueryHandler(telegram_plugin.handle_model_callback, pattern=r"^changemodel:"))
+                app.add_handler(CallbackQueryHandler(telegram_plugin.handle_menu_callback))
+                logger.info("Callback handlers registered")
+            else:
+                logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
-            logger.info("Callback handlers registered")
+            # Message handler for general messages
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         else:
-            logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
+            logger.warning("Telegram bot token is invalid or not configured. Telegram bot will not be started.")
+            # app remains None
 
-        # Message handler for general messages
-        app.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
-        )
+        # --- Discord Bot Setup (moved from main() to run() for consistent active check) ---
+        discord_plugin = plugin_manager.plugins.get("discord")
+        if discord_plugin and plugin_manager.plugins["discord"] in plugin_manager.get_enabled_plugins():
+            discord_config = self.config.PLUGINS.get('discord', {})
+            discord_token = discord_config.get('bot_token')
+            if discord_token:
+                logger.info("Discord bot is configured and will attempt to start.")
+                discord_bot_active = True
+            else:
+                logger.warning("Discord bot token not configured. Discord bot will not be started.")
+        
+        # --- Overall Connection Status Check ---
+        if not telegram_bot_active and not discord_bot_active:
+            logger.error("No bot connections (Telegram or Discord) are active. Please check your configuration.")
+            if self.test_mode:
+                logger.info("Test mode completed with no active connections.")
+            return # Exit if no connections are active
 
+        # If we are in test mode and Telegram bot is active, run the test initialization
         if self.test_mode:
-            logger.info("Running bot in test mode (initialization and API connection test).")
-            asyncio.run(self._test_initialize_and_run(app)) # Call the async test initializer
+            if telegram_bot_active:
+                logger.info("Running Telegram bot in test mode (initialization and API connection test).")
+                asyncio.run(self._test_initialize_and_run(app)) # Call the async test initializer
+            else:
+                logger.info("Test mode completed without Telegram bot active.")
             return # Exit after initialization test
 
-        # Start the bot
-        logger.info("Starting Telegram Ollama bot")
-        app.run_polling()
+        # --- Start Discord Bot in Background (only if configured) ---
+        if discord_bot_active:
+            import threading
+            # Call the actual run_discord_bot method which handles starting the thread
+            threading.Thread(target=self.run_discord_bot).start()
+            logger.info("Discord bot background thread started.")
+
+        # --- Start Telegram Bot (only if configured and not in test mode) ---
+        if telegram_bot_active:
+            logger.info("Starting Telegram Ollama bot")
+            app.run_polling()
 
     def _get_available_tools(self) -> list:
         """Get list of available tools for the LLM"""
@@ -1024,12 +1065,6 @@ def main(test_mode: bool = False): # Added test_mode argument
         bot.run() # The run method handles the test_mode logic internally
         logger.info("Test mode completed.")
         return
-
-    # Run Discord bot in background if enabled
-    import threading
-    discord_thread = threading.Thread(target=bot.run_discord_bot)
-    discord_thread.daemon = True
-    discord_thread.start()
 
     # Run Telegram bot
     bot.run()
