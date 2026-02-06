@@ -20,14 +20,14 @@ class SettingsManager:
 
     def __init__(self):
         # Determine the base directory for config files
-        # Prioritize BOT_CONFIG_DIR environment variable, otherwise use current file's directory
-        self._config_dir = Path(os.getenv("BOT_CONFIG_DIR", Path(__file__).parent))
+        # Prioritize BOT_CONFIG_DIR environment variable, otherwise use current working directory
+        self._config_dir = Path(os.getenv("BOT_CONFIG_DIR", Path.cwd()))
         self.settings = {}
         self.load_settings()
 
     def load_settings(self):
         """Load settings with proper fallback logic."""
-        # Priority order: config.example.py (to create config.py) -> config.py -> environment variables
+        # Priority order: config.py (user) -> config.example.py (fallback) -> environment variables
 
         # Define config file paths
         example_config_file = self._config_dir / 'config.example.py'
@@ -36,20 +36,7 @@ class SettingsManager:
         if not example_config_file.exists():
             raise FileNotFoundError(f"{example_config_file} not found. This template file is required for default settings.")
 
-        # If user config file doesn't exist, create it from the example
-        if not user_config_file.exists():
-            try:
-                shutil.copyfile(example_config_file, user_config_file)
-                logger.info(f"Created '{user_config_file.name}' from '{example_config_file.name}'. Please edit it with your configuration.")
-                # Give write permissions to the new config file for easier editing
-                os.chmod(user_config_file, 0o664)
-            except Exception as e:
-                logger.error(f"Error creating user config file '{user_config_file}': {e}")
-                # Fallback to loading example directly if creation fails
-                self._load_config_file(example_config_file, is_example=True)
-                logger.warning(f"Could not create '{user_config_file.name}'. Using defaults from '{example_config_file.name}'.")
-        
-        # Load the user config file (which might have just been created)
+        # Attempt to load user config file
         if user_config_file.exists():
             try:
                 self._load_config_file(user_config_file)
@@ -59,7 +46,7 @@ class SettingsManager:
                 # If user config is broken, try loading example defaults
                 self._load_config_file(example_config_file, is_example=True)
         else:
-            # Fallback if user_config_file still doesn't exist for some reason
+            # If user config file doesn't exist, load example defaults directly
             self._load_config_file(example_config_file, is_example=True)
             logger.warning(f"Configuration file '{user_config_file.name}' not found. Using defaults from '{example_config_file.name}'.")
 

@@ -24,7 +24,7 @@ cd telegram-ollama-bot
 
 ## Step 3: Configure Environment Variables
 
-The bot uses environment variables and/or a `config.py` file for configuration. It's recommended to manage `config.py` within a persistent host directory for easier updates and portability.
+The bot uses environment variables and/or a `config.py` file for configuration. It's recommended to manage `config.py` within a persistent host directory for Docker deployments, or the current working directory for local runs.
 
 Create a `.env` file in the project root to store your primary environment variables.
 
@@ -41,25 +41,34 @@ nano .env  # or your preferred editor
 *   `TELEGRAM_BOT_TOKEN=your_actual_bot_token_here` (Replace with the token you got from @BotFather)
 *   `OLLAMA_HOST=http://your_ollama_ip:11434` (This **must** be set to the address of your existing Ollama instance.)
 
-**Important: Initializing `config.py` within the persistent host directory**
+**Optional Environment Variable for Configuration Directory:**
 
-For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `config.py` file. This file should be placed within the host directory `/opt/telegram-ollama-bot`.
+*   `BOT_CONFIG_DIR`: This variable controls where `config.py` and the `deepthought_bot.db` database file are stored.
+    *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/opt/telegram-ollama-bot`.
+    *   **Outside Docker:** If not set, it defaults to the directory where the bot is run. You can explicitly set it if you want to store config/DB in a different location (e.g., `export BOT_CONFIG_DIR=/path/to/my/config`).
 
-If `config.py` doesn't exist in this directory, the bot will automatically create it from `config.example.py` (located in the container's `/app` directory) during its first run. To create or customize your `config.py`:
+**Important: Initializing `config.py` within the configuration directory**
 
-1.  **Ensure the host directory exists:**
+For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `config.py` file. This file should be placed within the configured `BOT_CONFIG_DIR`.
+
+**Automatic Creation:** If `config.py` doesn't exist in the `BOT_CONFIG_DIR` when the bot starts, it will automatically copy `config.example.py` (from inside the application's source) to `config.py`.
+
+To customize your `config.py` for persistent changes:
+
+1.  **For Docker deployments, ensure the host directory exists:**
     ```bash
     sudo mkdir -p /opt/telegram-ollama-bot
     sudo chown -R $USER:$USER /opt/telegram-ollama-bot # Adjust ownership as needed
     ```
-2.  **Copy `config.example.py` from the project's root to the host directory (if you want to start customizing before the first run):**
+    For local deployments, the current working directory is used by default.
+
+2.  **Start the bot once.** This will create the `config.py` file in the configured `BOT_CONFIG_DIR` if it doesn't already exist.
+3.  **Edit `config.py` in the configured `BOT_CONFIG_DIR`:**
     ```bash
-    cp config.example.py /opt/telegram-ollama-bot/config.py
+    nano /opt/telegram-ollama-bot/config.py # For Docker deployments
+    nano ./config.py # For local deployments (if BOT_CONFIG_DIR is not set)
     ```
-3.  **Edit `config.py` directly on your host machine:**
-    ```bash
-    nano /opt/telegram-ollama-bot/config.py # or your preferred editor
-    ```
+    After editing, restart the bot for changes to take effect.
 
 **Other Optional Settings (with defaults):**
 
@@ -117,6 +126,9 @@ docker-compose logs -f # View bot logs
 *   **"Connection refused" to Ollama:**
     *   Verify `OLLAMA_HOST` in your `.env` (or Portainer environment variables) correctly points to a running Ollama instance, and that network connectivity is allowed from the bot container.
     *   Ensure your Ollama instance is actually running and accessible at the specified host and port.
+*   **`config.py` not created or accessible:**
+    *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages about copying `config.example.py` or permission errors.
+    *   Ensure the host directory `/opt/telegram-ollama-bot` exists and that the Docker user (`app` inside the container) has write permissions to it. You can adjust ownership with `sudo chown -R $USER:$USER /opt/telegram-ollama-bot` on your host, replacing `$USER` with the user running Docker.
 
 ## 💾 Data Persistence
 
