@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-import requests
+import aiohttp
+import json
 from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
 
@@ -38,20 +39,20 @@ class OllamaProvider(LLMProvider):
         retries = kwargs.get('retries', 3)
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(
-                    requests.post,
-                    f"{self.host}/api/generate",
-                    json={
-                        "model": model,
-                        "prompt": prompt,
-                        "stream": False,
-                    },
-                    timeout=self.timeout,
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data.get("response", "No response returned.")
-            except requests.Timeout:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{self.host}/api/generate",
+                        json={
+                            "model": model,
+                            "prompt": prompt,
+                            "stream": False,
+                        },
+                        timeout=self.timeout,
+                    ) as response:
+                        response.raise_for_status()
+                        data = await response.json()
+                        return data.get("response", "No response returned.")
+            except asyncio.TimeoutError:
                 if attempt < retries - 1:
                     logger.warning(f"Ollama timeout (attempt {attempt + 1}/{retries}), retrying...")
                     await asyncio.sleep(1)
@@ -59,24 +60,24 @@ class OllamaProvider(LLMProvider):
                 else:
                     logger.error(f"Ollama timeout after {retries} attempts")
                     return "❌ AI service timeout. Please try again later."
-            except requests.RequestException as e:
+            except aiohttp.ClientError as e:
                 logger.error(f"Ollama generate error: {e}")
-                return "❌ Error communicating with the AI service."
+                return f"❌ Error communicating with the AI service: {e}"
 
         return "❌ Unexpected error occurred."
 
     async def list_models(self) -> list[str]:
         """List available Ollama models"""
         try:
-            response = await asyncio.to_thread(
-                requests.get,
-                f"{self.host}/api/tags",
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return [m["name"] for m in data.get("models", [])]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.host}/api/tags",
+                    timeout=self.timeout,
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    return [m["name"] for m in data.get("models", [])]
+        except aiohttp.ClientError as e:
             logger.error(f"Ollama list models error: {e}")
             return []
 
@@ -102,18 +103,17 @@ class OpenAIProvider(LLMProvider):
                 "max_tokens": kwargs.get('max_tokens', 1000),
                 "temperature": kwargs.get('temperature', 0.7)
             }
-
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    return result["choices"][0]["message"]["content"]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"OpenAI generate error: {e}")
             return "❌ Error communicating with OpenAI."
 
@@ -121,18 +121,18 @@ class OpenAIProvider(LLMProvider):
         """List available OpenAI models"""
         try:
             headers = {"Authorization": f"Bearer {self.api_key}"}
-            response = await asyncio.to_thread(
-                requests.get,
-                f"{self.base_url}/models",
-                headers=headers,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            data = response.json()
-            # Filter for chat models that might be free
-            models = [m["id"] for m in data.get("data", [])]
-            return [m for m in models if "gpt" in m.lower()]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/models",
+                    headers=headers,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    # Filter for chat models that might be free
+                    models = [m["id"] for m in data.get("data", [])]
+                    return [m for m in models if "gpt" in m.lower()]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"OpenAI list models error: {e}")
             return ["gpt-3.5-turbo", "gpt-4"]  # Fallback
 
@@ -158,18 +158,17 @@ class GroqProvider(LLMProvider):
                 "max_tokens": kwargs.get('max_tokens', 1000),
                 "temperature": kwargs.get('temperature', 0.7)
             }
-
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    return result["choices"][0]["message"]["content"]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Groq generate error: {e}")
             return "❌ Error communicating with Groq."
 
@@ -177,17 +176,17 @@ class GroqProvider(LLMProvider):
         """List available Groq models"""
         try:
             headers = {"Authorization": f"Bearer {self.api_key}"}
-            response = await asyncio.to_thread(
-                requests.get,
-                f"{self.base_url}/models",
-                headers=headers,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            data = response.json()
-            models = [m["id"] for m in data.get("data", [])]
-            return models
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/models",
+                    headers=headers,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    models = [m["id"] for m in data.get("data", [])]
+                    return models
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Groq list models error: {e}")
             return ["llama2-70b-4096", "mixtral-8x7b-32768"]  # Fallback
 
@@ -216,18 +215,17 @@ class TogetherProvider(LLMProvider):
                 "top_k": kwargs.get('top_k', 50),
                 "repetition_penalty": kwargs.get('repetition_penalty', 1.0)
             }
-
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{self.base_url}/completions",
-                headers=headers,
-                json=data,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["text"]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    return result["choices"][0]["text"]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Together AI generate error: {e}")
             return "❌ Error communicating with Together AI."
 
@@ -235,17 +233,17 @@ class TogetherProvider(LLMProvider):
         """List available Together AI models"""
         try:
             headers = {"Authorization": f"Bearer {self.api_key}"}
-            response = await asyncio.to_thread(
-                requests.get,
-                f"{self.base_url}/models",
-                headers=headers,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            data = response.json()
-            models = [m["id"] for m in data if not m.get("deprecated", False)]
-            return models
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/models",
+                    headers=headers,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    models = [m["id"] for m in data if not m.get("deprecated", False)]
+                    return models
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Together AI list models error: {e}")
             return ["mistralai/Mixtral-8x7B-Instruct-v0.1", "meta-llama/Llama-2-70b-chat-hf"]  # Fallback
 
@@ -273,26 +271,25 @@ class HuggingFaceProvider(LLMProvider):
                 },
                 "options": {"wait_for_model": True}
             }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/{model}",
+                    headers=headers,
+                    json=data,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    result = await response.json()
 
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{self.base_url}/{model}",
-                headers=headers,
-                json=data,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
+                    # Handle different response formats
+                    if isinstance(result, list) and result:
+                        if "generated_text" in result[0]:
+                            return result[0]["generated_text"]
+                        elif "conversation" in result[0]:
+                            return result[0]["conversation"]["generated_responses"][-1]
 
-            # Handle different response formats
-            if isinstance(result, list) and result:
-                if "generated_text" in result[0]:
-                    return result[0]["generated_text"]
-                elif "conversation" in result[0]:
-                    return result[0]["conversation"]["generated_responses"][-1]
-
-            return str(result)
-        except requests.RequestException as e:
+                    return str(result)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Hugging Face generate error: {e}")
             return "❌ Error communicating with Hugging Face."
 
@@ -328,18 +325,17 @@ class AnthropicProvider(LLMProvider):
                 "max_tokens": kwargs.get('max_tokens', 1000),
                 "messages": [{"role": "user", "content": prompt}]
             }
-
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{self.base_url}/messages",
-                headers=headers,
-                json=data,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["content"][0]["text"]
-        except requests.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/messages",
+                    headers=headers,
+                    json=data,
+                    timeout=self.timeout
+                ) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    return result["content"][0]["text"]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"Anthropic generate error: {e}")
             return "❌ Error communicating with Anthropic."
 
@@ -481,11 +477,12 @@ You have access to the following tools:
 {tools_section}
 
 To use a tool, respond with a JSON object in this format:
-TOOL_CALL: {{"tool": "tool_name", "parameters": {{"param1": "value1", "param2": "value2"}}}}
+TOOL_CALL: {{'tool': 'tool_name', 'parameters': {{'param1': 'value1', 'param2': 'value2'}}}} 
 
 You can make multiple tool calls if needed. After receiving tool results, provide your final answer.
 
-If you don't need to use any tools, just respond normally."""
+If you don't need to use any tools, just respond normally.
+"""
 
         return enhanced_prompt
 
