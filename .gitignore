@@ -49,6 +49,7 @@ secrets.json
 # Virtual environments
 .env
 venv/
+.venv/
 env/
 ENV/
 env.bak/
