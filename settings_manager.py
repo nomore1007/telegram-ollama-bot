@@ -19,9 +19,14 @@ class SettingsManager:
     """Manages loading and validation of bot settings."""
 
     def __init__(self):
-        # Determine the base directory for config files
+        # Determine the base directory for persistent config files (user-editable)
         # Prioritize BOT_CONFIG_DIR environment variable, otherwise use current working directory
         self._config_dir = Path(os.getenv("BOT_CONFIG_DIR", Path.cwd()))
+
+        # Determine the application source directory (where config.example.py is)
+        # In Docker, this is /app. Outside Docker, it's the script's directory.
+        self._app_source_dir = Path(os.getenv("BOT_APP_SOURCE_DIR", Path(__file__).parent))
+
         self.settings = {}
         self.load_settings()
 
@@ -30,7 +35,7 @@ class SettingsManager:
         # Priority order: config.py (user) -> config.example.py (fallback) -> environment variables
 
         # Define config file paths
-        example_config_file = self._config_dir / 'config.example.py'
+        example_config_file = self._app_source_dir / 'config.example.py'
         user_config_file = self._config_dir / 'config.py'
 
         if not example_config_file.exists():

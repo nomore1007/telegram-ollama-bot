@@ -17,12 +17,13 @@ services:
       - TEMPERATURE=${TEMPERATURE:-0.7}
       - TIMEOUT=${TIMEOUT:-30}
       - DEFAULT_PROMPT=${DEFAULT_PROMPT}
-      - BOT_CONFIG_DIR=/opt/telegram-ollama-bot # Set the config directory
+      - BOT_CONFIG_DIR=/app/data # Set the config directory inside the container
+      - BOT_APP_SOURCE_DIR=/app # Set the application source directory
     networks:
       - bot-network
     volumes:
       - bot_logs:/app/logs
-      - /opt/telegram-ollama-bot:/opt/telegram-ollama-bot # Bind mount for config files
+      - /opt/telegram-ollama-bot:/app/data # Bind mount for config files to /app/data inside container
 
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]

@@ -41,11 +41,14 @@ nano .env  # or your preferred editor
 *   `TELEGRAM_BOT_TOKEN=your_actual_bot_token_here` (Replace with the token you got from @BotFather)
 *   `OLLAMA_HOST=http://your_ollama_ip:11434` (This **must** be set to the address of your existing Ollama instance.)
 
-**Optional Environment Variable for Configuration Directory:**
+**Optional Environment Variables for Configuration Directories:**
 
 *   `BOT_CONFIG_DIR`: This variable controls where `config.py` and the `deepthought_bot.db` database file are stored.
-    *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/opt/telegram-ollama-bot`.
+    *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/app/data`.
     *   **Outside Docker:** If not set, it defaults to the directory where the bot is run. You can explicitly set it if you want to store config/DB in a different location (e.g., `export BOT_CONFIG_DIR=/path/to/my/config`).
+*   `BOT_APP_SOURCE_DIR`: This variable controls where the application expects to find its source code and `config.example.py`.
+    *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/app`.
+    *   **Outside Docker:** If not set, it defaults to the directory where the `settings_manager.py` script is located. You generally won't need to change this.
 
 **Important: Initializing `config.py` within the configuration directory**
 
@@ -131,7 +134,7 @@ docker-compose logs -f # View bot logs
     *   Ensure your Ollama instance is actually running and accessible at the specified host and port.
 *   **`config.py` not created or accessible:**
     *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages confirming the copy operation or any reported errors.
-    *   **Crucially, ensure the host directory `/opt/telegram-ollama-bot` exists and has the correct ownership and write permissions for the non-root Docker user (UID 1000, GID 1000).** The entrypoint script does *not* automatically fix ownership on your host; this *must* be done manually before deployment. Example: `sudo chown -R 1000:1000 /opt/telegram-ollama-bot` on your host.
+    *   **Crucially, ensure the host directory `/opt/telegram-ollama-bot` exists and is writable by the non-root Docker user (app, UID 1000, GID 1000).** The entrypoint script will copy `config.example.py` and then set its ownership and permissions for the `app` user, but it cannot make the *directory itself* writable if the host permissions prevent it.
 
 ## 💾 Data Persistence
 
