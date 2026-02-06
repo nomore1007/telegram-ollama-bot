@@ -19,6 +19,10 @@ services:
       - DEFAULT_PROMPT=${DEFAULT_PROMPT}
       - BOT_CONFIG_DIR=/app/data # Set the config directory inside the container
       - BOT_APP_SOURCE_DIR=/app # Set the application source directory
+    dns:
+      - 8.8.8.8
+    networks:
+      - bot-network
     volumes:
       - bot_logs:/app/logs
       - /opt/telegram-ollama-bot:/app/data # Bind mount for config files to /app/data inside container
@@ -40,3 +44,7 @@ services:
 volumes:
   bot_logs:
     driver: local
+
+networks:
+  bot-network:
+    driver: bridge

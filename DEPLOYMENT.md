@@ -50,91 +50,24 @@ nano .env  # or your preferred editor
     *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/app`.
     *   **Outside Docker:** If not set, it defaults to the directory where the `settings_manager.py` script is located. You generally won't need to change this.
 
-**Network Configuration:**
-For Docker deployments, the `telegram-bot` service is configured to use `8.8.8.8` (Google's DNS) to help resolve potential DNS issues within the container.
-
-**Important: Initializing `config.py` within the configuration directory**
-
-For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `config.py` file. This file should be placed within the configured `BOT_CONFIG_DIR`.
-
-**Automatic Creation:** If `config.py` doesn't exist in the `BOT_CONFIG_DIR` when the bot starts, it will automatically copy `config.example.py` (from inside the application's source) to `config.py`.
-
-To customize your `config.py` for persistent changes:
-
-1.  **For Docker deployments, ensure the host directory exists AND has correct ownership (VERY IMPORTANT!):**
-    ```bash
-    sudo mkdir -p /opt/telegram-ollama-bot
-    # The Docker user 'app' (UID 1000, GID 1000) needs write permissions to this directory.
-    # THIS STEP IS CRUCIAL AND MUST BE DONE BEFORE DEPLOYING THE CONTAINER.
-    # The entrypoint script will NOT attempt to fix permissions on the host.
-    sudo chown -R 1000:1000 /opt/telegram-ollama-bot
-    ```
-    For local deployments, the current working directory is used by default.
-
-2.  **Start the bot once.** This will create the `config.py` file in the configured `BOT_CONFIG_DIR` if it doesn't already exist.
-3.  **Edit `config.py` in the configured `BOT_CONFIG_DIR`:**
-    ```bash
-    nano /opt/telegram-ollama-bot/config.py # For Docker deployments
-    nano ./config.py # For local deployments (if BOT_CONFIG_DIR is not set)
-    ```
-    After editing, restart the bot for changes to take effect.
-
-**Other Optional Settings (with defaults):**
-
-```bash
-BOT_USERNAME=DeepthoughtBot
-OLLAMA_MODEL=llama2
-TIMEOUT=30
-```
-
-## Step 4: Deploy the Bot
-
-This will deploy the bot as a standalone service, connecting to your specified external Ollama instance.
-
-```bash
-# Build bot container (first time or after code changes)
-docker-compose build
-
-# Start bot service
-docker-compose up -d
-```
-
-## Step 5: Verify Deployment
-
-*   **Check container status:**
-    ```bash
-    docker-compose ps
-    ```
-    Ensure your `telegram-bot` container is in the `Up` state.
-
-*   **View logs:**
-    ```bash
-    docker-compose logs -f
-    ```
-    Look for messages indicating successful startup and bot activity.
-
-*   **Test bot functionality:** Send a message to your bot on Telegram.
-
-## 🛠️ Management Commands
-
-You can use `docker-compose` commands directly.
-
-### Basic `docker-compose` Operations
-```bash
-docker-compose up -d   # Start bot service
-docker-compose down    # Stop bot service
-docker-compose restart # Restart bot service
-docker-compose logs -f # View bot logs
-```
-
 ## 🚨 Troubleshooting
 
 *   **Bot Not Responding:**
     *   Check `TELEGRAM_BOT_TOKEN` in your `.env` file (or Portainer environment variables).
     *   View container logs for errors.
-*   **"Connection refused" to Ollama:**
-    *   Verify `OLLAMA_HOST` in your `.env` (or Portainer environment variables) correctly points to a running Ollama instance, and that network connectivity is allowed from the bot container.
-    *   Ensure your Ollama instance is actually running and accessible at the specified host and port.
+*   **Network Connectivity Issues / "Connection refused" to Ollama / `telegram.error.TimedOut`:**
+    *   **Is Ollama running?** Verify your Ollama instance is actually running and accessible at the specified `OLLAMA_HOST`.
+    *   **Check `OLLAMA_HOST`:** Ensure `OLLAMA_HOST` in your `.env` (or Portainer environment variables) correctly points to your running Ollama instance.
+    *   **Debug from inside the container:** If the bot keeps restarting due to network errors, you might need to temporarily run a shell in the container for debugging.
+        1.  Stop the `deepthought-bot` container in Portainer.
+        2.  Edit the stack in Portainer, changing the `command` for the `telegram-bot` service to `/bin/bash` (e.g., `command: /bin/bash`). Redeploy.
+        3.  Access the container's console via Portainer.
+        4.  Run network diagnostics:
+            *   `ping -c 3 8.8.8.8` (Test external IP connectivity)
+            *   `ping -c 3 google.com` (Test DNS resolution)
+            *   `curl -v https://api.telegram.org` (Test HTTPS connectivity to Telegram API)
+            *   `cat /etc/resolv.conf` (Check DNS server configuration)
+        5.  **Important:** After debugging, revert the `command: /bin/bash` change and redeploy the stack.
 *   **`config.py` not created or accessible:**
     *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages confirming the copy operation or any reported errors.
     *   **Crucially, ensure the host directory `/opt/telegram-ollama-bot` exists and is writable by the non-root Docker user (app, UID 1000, GID 1000).** The entrypoint script will copy `config.example.py` and then set its ownership and permissions for the `app` user, but it cannot make the *directory itself* writable if the host permissions prevent it.
@@ -147,7 +80,7 @@ docker-compose logs -f # View bot logs
 ## 🔒 Security Considerations
 
 *   **Environment Variables**: Never commit your `.env` file to version control.
-*   **Host Network Mode**: The container shares the network stack of the host. This can expose container ports to the host's network interfaces directly and bypass network isolation. Ensure you understand the implications.
+*   **Network Isolation**: Docker Compose creates isolated networks by default.
 *   **Non-root User**: The bot runs as an unprivileged user within its container.
 
 ---
