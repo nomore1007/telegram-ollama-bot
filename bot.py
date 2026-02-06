@@ -46,7 +46,7 @@ def safe_import_plugin(module_name, class_name):
     try:
         module = __import__(f'plugins.{module_name}', fromlist=[class_name])
         plugin_class = getattr(module, class_name)
-        logger.info(f"Successfully imported plugin: {module_name}")
+        logger.debug(f"Successfully imported plugin: {module_name}")
         return plugin_class
     except ImportError as e:
         logger.warning(f"Failed to import plugin {module_name}: {e}. Skipping this plugin.")
@@ -317,19 +317,19 @@ class TelegramOllamaBot:
             is_group_chat = chat_type in ["group", "supergroup"]
             bot_mentioned = False
 
-            logger.info(f"Message in {chat_type} chat, bot_username: {self.bot_username}")
+            logger.debug(f"Message in {chat_type} chat, bot_username: {self.bot_username}")
 
             if is_group_chat:
-                logger.info(f"Group chat message: '{message_text}', checking for mention")
+                logger.debug(f"Group chat message: '{message_text}', checking for mention")
                 if self.bot_username and f"@{self.bot_username}" in message_text:
                     bot_mentioned = True
-                    logger.info(f"Bot mentioned, processing message")
+                    logger.debug(f"Bot mentioned, processing message")
                     # Remove bot mention from the message text
                     message_text = message_text.replace(f"@{self.bot_username}", "").strip()
                     # Remove any leading/trailing whitespace after removing mention
                     message_text = message_text.strip()
                 else:
-                    logger.info(f"Bot not mentioned in group chat, ignoring")
+                    logger.debug(f"Bot not mentioned in group chat, ignoring")
                     # If in group chat and bot not mentioned, ignore
                     return
 
@@ -340,7 +340,7 @@ class TelegramOllamaBot:
 
             # If not a group chat or bot was mentioned in a group chat
             # Process the message with AI
-            logger.info("Sending message to AI for processing")
+            logger.debug("Sending message to AI for processing")
 
             # Check for YouTube URLs first (highest priority)
             youtube_urls = self.youtube_summarizer.extract_video_urls(message_text)
@@ -549,7 +549,7 @@ class TelegramOllamaBot:
             # Debug: Check what get_channel_setting returns
             raw_provider = self.get_channel_setting(channel_id_str, 'provider')
             raw_host = self.get_channel_setting(channel_id_str, 'host')
-            logger.info(f"Channel {channel_id_str}: raw_provider={raw_provider}, raw_host={raw_host}, final_provider={channel_provider}, final_host={channel_host}")
+            logger.debug(f"Channel {channel_id_str}: raw_provider={raw_provider}, raw_host={raw_host}, final_provider={channel_provider}, final_host={channel_host}")
 
 
 
