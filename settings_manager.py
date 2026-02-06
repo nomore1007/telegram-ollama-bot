@@ -106,9 +106,24 @@ class SettingsManager:
                         self.settings[key] = []
                 elif key == 'ENABLED_PLUGINS': # Special case for comma-separated plugins
                     self.settings[key] = [p.strip() for p in value.split(',')]
-                else:
+                # Handle specific plugin tokens that need nested structure
+                elif key == 'TELEGRAM_BOT_TOKEN':
+                    if 'PLUGINS' not in self.settings:
+                        self.settings['PLUGINS'] = {}
+                    if 'telegram' not in self.settings['PLUGINS']:
+                        self.settings['PLUGINS']['telegram'] = {}
+                    self.settings['PLUGINS']['telegram']['bot_token'] = value
+                    logger.debug(f"Overridden setting from environment: PLUGINS['telegram']['bot_token']={self.settings['PLUGINS']['telegram']['bot_token']}")
+                elif key == 'DISCORD_BOT_TOKEN':
+                    if 'PLUGINS' not in self.settings:
+                        self.settings['PLUGINS'] = {}
+                    if 'discord' not in self.settings['PLUGINS']:
+                        self.settings['PLUGINS']['discord'] = {}
+                    self.settings['PLUGINS']['discord']['bot_token'] = value
+                    logger.debug(f"Overridden setting from environment: PLUGINS['discord']['bot_token']={self.settings['PLUGINS']['discord']['bot_token']}")
+                else: # Generic handling for other keys
                     self.settings[key] = value
-                logger.debug(f"Overridden setting from environment: {key}={self.settings[key]}")
+                    logger.debug(f"Overridden setting from environment: {key}={self.settings[key]}")
 
     def _validate_required_settings(self):
         """Validate that required settings are present."""

@@ -85,8 +85,9 @@ logging.basicConfig(
 class TelegramOllamaBot:
     """Main Telegram bot class integrating Ollama AI"""
 
-    def __init__(self, config):
+    def __init__(self, config, test_mode: bool = False): # Added test_mode
         self.config = config
+        self.test_mode = test_mode # Stored test_mode
         # Initialize LLM client based on provider
         llm_provider = getattr(config, 'LLM_PROVIDER', 'ollama')
         llm_kwargs = {
@@ -639,6 +640,21 @@ class TelegramOllamaBot:
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands set successfully.")
 
+    async def _test_initialize_and_run(self, app: Application):
+        """Initializes the application for testing purposes and then runs the polling."""
+        try:
+            logger.info("Test mode: Attempting to initialize Telegram API connection...")
+            await app.initialize() # This calls self.bot.get_me()
+            logger.info("Test mode: Telegram API connection successful.")
+            logger.info("Test mode: Initializing plugins for test run...")
+            # We explicitly call post_init here as run_polling() won't be called
+            await self.post_init(app) # Ensure commands are set
+            logger.info("Test mode: Application initialized successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Test mode: Telegram API connection failed: {e}")
+            return False
+
     def run(self):
         """
         Runs the bot.
@@ -659,8 +675,6 @@ class TelegramOllamaBot:
                     # getattr on instance returns bound method, use directly
                     app.add_handler(CommandHandler(command, handler_method))
 
-        # Legacy command handlers removed - using plugin system exclusively
-
         # Callback query handlers from plugins
         telegram_plugin = plugin_manager.plugins.get("telegram")
         logger.info(f"Telegram plugin found: {telegram_plugin is not None}")
@@ -677,14 +691,15 @@ class TelegramOllamaBot:
         else:
             logger.error("Telegram plugin not found or not enabled - callback handlers not registered!")
 
-        # Legacy callback handlers removed - using plugin system
-
-
-
         # Message handler for general messages
         app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
+
+        if self.test_mode:
+            logger.info("Running bot in test mode (initialization and API connection test).")
+            asyncio.run(self._test_initialize_and_run(app)) # Call the async test initializer
+            return # Exit after initialization test
 
         # Start the bot
         logger.info("Starting Telegram Ollama bot")
@@ -833,7 +848,11 @@ class TelegramOllamaBot:
 
             calc_plugin = plugin_manager.plugins.get('calculator')
             if calc_plugin:
+                # For this test, we can directly call the plugin's _safe_eval if it's sync
+                # For async, we'd mock it or run it in a sync wrapper
                 try:
+                    # Assuming _safe_eval is synchronous
+                    # If it's async, we'd need to await it and potentially mock aiohttp calls within it
                     result = calc_plugin._safe_eval(expression)
                     return f"Result: {result}"
                 except Exception as e:
@@ -996,8 +1015,15 @@ OllamaClient = LLMClient  # For backward compatibility with tests
 # Entry point
 # -------------------------------------------------------------------
 
-def main():
-    bot = TelegramOllamaBot(settings)
+def main(test_mode: bool = False): # Added test_mode argument
+    bot = TelegramOllamaBot(settings, test_mode=test_mode) # Pass test_mode
+
+    # If in test mode, only run initialization and then exit
+    if test_mode:
+        logger.info("Running bot in test mode (initialization and API connection test).")
+        bot.run() # The run method handles the test_mode logic internally
+        logger.info("Test mode completed.")
+        return
 
     # Run Discord bot in background if enabled
     import threading
