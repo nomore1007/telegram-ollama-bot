@@ -50,28 +50,6 @@ nano .env  # or your preferred editor
     *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/app`.
     *   **Outside Docker:** If not set, it defaults to the directory where the `settings_manager.py` script is located. You generally won't need to change this.
 
-## 🚨 Troubleshooting
-
-*   **Bot Not Responding:**
-    *   Check `TELEGRAM_BOT_TOKEN` in your `.env` file (or Portainer environment variables).
-    *   View container logs for errors.
-*   **Network Connectivity Issues / "Connection refused" to Ollama / `telegram.error.TimedOut`:**
-    *   **Is Ollama running?** Verify your Ollama instance is actually running and accessible at the specified `OLLAMA_HOST`.
-    *   **Check `OLLAMA_HOST`:** Ensure `OLLAMA_HOST` in your `.env` (or Portainer environment variables) correctly points to your running Ollama instance.
-    *   **Debug from inside the container:** If the bot keeps restarting due to network errors, you might need to temporarily run a shell in the container for debugging.
-        1.  Stop the `deepthought-bot` container in Portainer.
-        2.  Edit the stack in Portainer, changing the `command` for the `telegram-bot` service to `/bin/bash` (e.g., `command: /bin/bash`). Redeploy.
-        3.  Access the container's console via Portainer.
-        4.  Run network diagnostics:
-            *   `ping -c 3 8.8.8.8` (Test external IP connectivity)
-            *   `ping -c 3 google.com` (Test DNS resolution)
-            *   `curl -v https://api.telegram.org` (Test HTTPS connectivity to Telegram API)
-            *   `cat /etc/resolv.conf` (Check DNS server configuration)
-        5.  **Important:** After debugging, revert the `command: /bin/bash` change and redeploy the stack.
-*   **`config.py` not created or accessible:**
-    *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages confirming the copy operation or any reported errors.
-    *   **Crucially, ensure the host directory `/opt/telegram-ollama-bot` exists and is writable by the non-root Docker user (app, UID 1000, GID 1000).** The entrypoint script will copy `config.example.py` and then set its ownership and permissions for the `app` user, but it cannot make the *directory itself* writable if the host permissions prevent it.
-
 ## 💾 Data Persistence
 
 *   **Bot Logs:** Stored in `bot_logs` volume.
