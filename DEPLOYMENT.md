@@ -55,10 +55,13 @@ For advanced configuration (e.g., plugin settings, complex personality prompts) 
 
 To customize your `config.py` for persistent changes:
 
-1.  **For Docker deployments, ensure the host directory exists:**
+1.  **For Docker deployments, ensure the host directory exists AND has correct ownership (VERY IMPORTANT!):**
     ```bash
     sudo mkdir -p /opt/telegram-ollama-bot
-    sudo chown -R $USER:$USER /opt/telegram-ollama-bot # Adjust ownership as needed
+    # The Docker user 'app' (UID 1000, GID 1000) needs write permissions to this directory.
+    # THIS STEP IS CRUCIAL AND MUST BE DONE BEFORE DEPLOYING THE CONTAINER.
+    # The entrypoint script will NOT attempt to fix permissions on the host.
+    sudo chown -R 1000:1000 /opt/telegram-ollama-bot
     ```
     For local deployments, the current working directory is used by default.
 
@@ -127,8 +130,8 @@ docker-compose logs -f # View bot logs
     *   Verify `OLLAMA_HOST` in your `.env` (or Portainer environment variables) correctly points to a running Ollama instance, and that network connectivity is allowed from the bot container.
     *   Ensure your Ollama instance is actually running and accessible at the specified host and port.
 *   **`config.py` not created or accessible:**
-    *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages about copying `config.example.py` or permission errors.
-    *   Ensure the host directory `/opt/telegram-ollama-bot` exists and that the Docker user (`app` inside the container) has write permissions to it. You can adjust ownership with `sudo chown -R $USER:$USER /opt/telegram-ollama-bot` on your host, replacing `$USER` with the user running Docker.
+    *   Check the bot container logs (`docker-compose logs -f`) for output from the `docker-entrypoint.sh` script. Look for messages confirming the copy operation or any reported errors.
+    *   **Crucially, ensure the host directory `/opt/telegram-ollama-bot` exists and has the correct ownership and write permissions for the non-root Docker user (UID 1000, GID 1000).** The entrypoint script does *not* automatically fix ownership on your host; this *must* be done manually before deployment. Example: `sudo chown -R 1000:1000 /opt/telegram-ollama-bot` on your host.
 
 ## 💾 Data Persistence
 
