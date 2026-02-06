@@ -20,6 +20,7 @@ from telegram.ext import (
     CallbackContext,
     filters,
 )
+from telegram.request import HTTPXRequest
 from constants import (    MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
     LOG_FORMAT, LOG_LEVEL
 )
@@ -681,7 +682,8 @@ class TelegramOllamaBot:
         bot_token = telegram_config.get('bot_token')
 
         if self._is_valid_telegram_token(bot_token):
-            app_builder = Application.builder().token(bot_token)
+            request = HTTPXRequest(connect_timeout=60.0, read_timeout=60.0)
+            app_builder = Application.builder().token(bot_token).request(request)
             app_builder.post_init(self.post_init)
             app = app_builder.build()
             telegram_bot_active = True
