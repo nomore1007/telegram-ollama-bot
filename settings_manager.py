@@ -18,6 +18,9 @@ class SettingsManager:
     """Manages loading and validation of bot settings."""
 
     def __init__(self):
+        # Determine the base directory for config files
+        # Prioritize BOT_CONFIG_DIR environment variable, otherwise use current file's directory
+        self._config_dir = Path(os.getenv("BOT_CONFIG_DIR", Path(__file__).parent))
         self.settings = {}
         self.load_settings()
 
@@ -26,7 +29,7 @@ class SettingsManager:
         # Priority order: settings.example.py -> settings.py -> environment variables
 
         # 1. Load example settings for defaults
-        example_settings_file = Path(__file__).parent / 'settings.example.py'
+        example_settings_file = self._config_dir / 'settings.example.py'
         if example_settings_file.exists():
             try:
                 self._load_settings_file(example_settings_file, is_example=True)
@@ -34,10 +37,10 @@ class SettingsManager:
             except Exception as e:
                 logger.error(f"Error loading {example_settings_file}: {e}")
         else:
-            raise FileNotFoundError("settings.example.py not found. This file is required for default settings.")
+            raise FileNotFoundError(f"{example_settings_file} not found. This file is required for default settings.")
 
         # 2. Load user settings to override defaults
-        user_settings_file = Path(__file__).parent / 'settings.py'
+        user_settings_file = self._config_dir / 'settings.py'
         if user_settings_file.exists():
             try:
                 self._load_settings_file(user_settings_file)
@@ -158,16 +161,24 @@ settings_manager = SettingsManager()
 class Config:
     """Backward compatibility wrapper."""
     def __getattr__(self, name):
+        if name == "BOT_CONFIG_DIR":
+            return settings_manager._config_dir
         return settings_manager.get(name)
 
     def __getitem__(self, name):
+        if name == "BOT_CONFIG_DIR":
+            return settings_manager._config_dir
         return settings_manager[name]
 
     def __contains__(self, name):
+        if name == "BOT_CONFIG_DIR":
+            return True # Always consider BOT_CONFIG_DIR as contained
         return name in settings_manager
 
     def get(self, key, default=None):
         """Get a setting value with default."""
+        if key == "BOT_CONFIG_DIR":
+            return settings_manager._config_dir
         return settings_manager.get(key, default)
 
 # Create backward-compatible settings object

@@ -1,7 +1,9 @@
 version: '3.8'
 
 services:
-  # Telegram Bot Service
+  # Telegram Bot Service (connects to existing Ollama)
+  # This compose file is for a bot-only deployment, connecting to an external Ollama instance.
+  # Ensure OLLAMA_HOST is correctly configured in your Portainer environment variables or .env file.
   telegram-bot:
     build: .
     container_name: deepthought-bot
@@ -9,18 +11,18 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - BOT_USERNAME=${BOT_USERNAME:-DeepthoughtBot}
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434} # Connects to external Ollama
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
       - MAX_TOKENS=${MAX_TOKENS:-2000}
       - TEMPERATURE=${TEMPERATURE:-0.7}
       - TIMEOUT=${TIMEOUT:-30}
       - DEFAULT_PROMPT=${DEFAULT_PROMPT}
-    depends_on:
-      - ollama
+      - BOT_CONFIG_DIR=/opt/telegram-ollama-bot # Set the config directory
     networks:
       - bot-network
     volumes:
-      - bot_logs:/app/logs # Persists bot logs
+      - bot_logs:/app/logs
+      - bot_config:/opt/telegram-ollama-bot # Mount volume for config files
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
@@ -31,35 +33,14 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-  # Ollama AI Service
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-server
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    volumes:
-      - ollama_data:/root/.ollama # Persists Ollama models
-    networks:
-      - bot-network
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    # Optional: Expose port if you want direct access
+    # ports:
+    #   - "8080:8080"
 
 volumes:
-  ollama_data:
-    driver: local
   bot_logs:
+    driver: local
+  bot_config:
     driver: local
 
 networks:
