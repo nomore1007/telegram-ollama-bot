@@ -1,46 +1,33 @@
 # 🚀 Telegram Ollama Bot - Deployment Guide
 
-## Quick Start (3 minutes)
+This guide provides instructions for deploying the Deepthought Bot using Docker and Docker Compose. You have two main deployment options:
 
-```bash
-# 1. Clone and setup
-git clone <your-repo-url>
-cd deepthought-bot
-cp .env.example .env
-
-# 2. Configure your bot token
-# Edit .env file and add your TELEGRAM_BOT_TOKEN
-
-# 3. Deploy
-make build && make up
-
-# 4. Check it's working
-make logs
-```
+1.  **Full Stack Deployment:** Deploy both the bot and an Ollama AI service together.
+2.  **Bot-Only Deployment:** Deploy only the bot and connect it to an existing, external Ollama AI service.
 
 ## 📋 Prerequisites
 
-- **Docker & Docker Compose** installed
-- **4GB+ RAM** recommended for Ollama models
-- **Telegram Bot Token** from [@BotFather](https://t.me/botfather)
+-   **Docker & Docker Compose** installed
+-   **4GB+ RAM** recommended for Ollama models (for Full Stack deployment)
+-   **Telegram Bot Token** from [@BotFather](https://t.me/botfather)
 
-## 🛠️ Complete Setup Guide
+## Step 1: Get Telegram Bot Token
 
-### Step 1: Get Telegram Bot Token
+1.  Message [@BotFather](https://t.me/botfather) on Telegram.
+2.  Send `/newbot`.
+3.  Follow instructions to create your bot.
+4.  Copy the API token (format: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`).
 
-1. Message [@BotFather](https://t.me/botfather) on Telegram
-2. Send `/newbot`
-3. Follow instructions to create your bot
-4. Copy the API token (format: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
-
-### Step 2: Clone Repository
+## Step 2: Clone Repository
 
 ```bash
-git clone <your-repository-url>
-cd deepthought-bot
+git clone https://github.com/nomore1007/telegram-ollama-bot.git
+cd telegram-ollama-bot
 ```
 
-### Step 3: Configure Environment
+## Step 3: Configure Environment Variables
+
+Create a `.env` file in the project root to store your configuration.
 
 ```bash
 # Copy template
@@ -50,237 +37,114 @@ cp .env.example .env
 nano .env  # or your preferred editor
 ```
 
-**Required settings in .env:**
-```bash
-TELEGRAM_BOT_TOKEN=your_actual_bot_token_here
-```
+**Required Setting:**
 
-**Optional settings (with defaults):**
+*   `TELEGRAM_BOT_TOKEN=your_actual_bot_token_here` (Replace with the token you got from @BotFather)
+
+**Important Optional Setting for Bot-Only Deployment:**
+
+*   `OLLAMA_HOST=http://your_ollama_ip:11434` (Only set this if you are using Bot-Only Deployment and have an external Ollama instance. Otherwise, for Full Stack Deployment, you can omit this, and the bot will connect to the Ollama service within the same Docker Compose stack.)
+
+**Other Optional Settings (with defaults):**
+
 ```bash
 BOT_USERNAME=DeepthoughtBot
-OLLAMA_HOST=http://ollama:11434
 OLLAMA_MODEL=llama2
 TIMEOUT=30
 ```
 
-### Step 4: Deploy with Docker
+## Step 4: Choose and Deploy Your Stack
+
+### Option 1: Full Stack Deployment (Bot + Ollama)
+
+Use this option if you want Docker Compose to manage both your Telegram bot and its dedicated Ollama AI service.
 
 ```bash
-# Build containers (first time only)
-make build
+# Build containers (first time or after code changes)
+docker-compose -f docker-compose.yml build
 
 # Start services
-make up
+docker-compose -f docker-compose.yml up -d
 
-# Check status
-make health
+# After starting, you may need to pull an Ollama model:
+# docker-compose exec ollama ollama pull llama2
 ```
 
-### Step 5: Verify Deployment
+### Option 2: Bot-Only Deployment (Connect to External Ollama)
+
+Use this option if you already have an Ollama AI service running elsewhere (e.g., on your host machine, another server, or a separate Docker container) and you want the bot to connect to it.
+
+**Make sure you have configured `OLLAMA_HOST` in your `.env` file (Step 3).**
 
 ```bash
-# Check logs
-make logs
+# Build bot container (first time or after code changes)
+docker-compose -f docker-compose.bot-only.yml build
 
-# Test bot functionality
-# Send a message to your bot on Telegram
+# Start bot service
+docker-compose -f docker-compose.bot-only.yml up -d
 ```
 
-## 📊 Service Architecture
+## Step 5: Verify Deployment
 
-```
-┌─────────────────┐    ┌─────────────────┐
-│  telegram-bot   │    │     ollama      │
-│                 │◄──►│                 │
-│ • Python 3.11   │    │ • llama2        │
-│ • Telegram API  │    │ • mistral       │
-│ • AI features   │    │ • codellama     │
-│ • Security      │    │                 │
-└─────────────────┘    └─────────────────┘
-```
+*   **Check container status:**
+    ```bash
+    docker-compose ps
+    # Or for bot-only:
+    docker-compose -f docker-compose.bot-only.yml ps
+    ```
+    Ensure your `telegram-bot` container (and `ollama` if using full stack) is in the `Up` state.
+
+*   **View logs:**
+    ```bash
+    docker-compose logs -f
+    # Or for bot-only:
+    docker-compose -f docker-compose.bot-only.yml logs -f
+    ```
+    Look for messages indicating successful startup and bot activity.
+
+*   **Test bot functionality:** Send a message to your bot on Telegram.
 
 ## 🛠️ Management Commands
 
-### Basic Operations
+You can use `docker-compose` commands directly, or if a `Makefile` is present in the project, it may provide convenient `make` commands as shortcuts.
+
+### Basic `docker-compose` Operations
 ```bash
-make up          # Start all services
-make down        # Stop all services
-make restart     # Restart services
-make logs        # View all logs
+# For Full Stack Deployment:
+docker-compose -f docker-compose.yml up -d   # Start all services
+docker-compose -f docker-compose.yml down    # Stop all services
+docker-compose -f docker-compose.yml restart # Restart services
+docker-compose -f docker-compose.yml logs -f # View all logs
+
+# For Bot-Only Deployment:
+docker-compose -f docker-compose.bot-only.yml up -d
+docker-compose -f docker-compose.bot-only.yml down
+docker-compose -f docker-compose.bot-only.yml restart
+docker-compose -f docker-compose.bot-only.yml logs -f
 ```
-
-### Development
-```bash
-make dev         # Development mode (live reload)
-make shell       # Access bot container
-make test        # Run tests
-```
-
-### Maintenance
-```bash
-make build       # Rebuild containers
-make clean       # Remove containers & volumes
-make health      # Check service status
-make pull        # Update Ollama image
-```
-
-## 🔧 Manual Docker Commands
-
-```bash
-# Build and run
-docker-compose build
-docker-compose up -d
-
-# View specific logs
-docker-compose logs -f telegram-bot
-docker-compose logs -f ollama
-
-# Stop and cleanup
-docker-compose down
-docker-compose down -v  # Remove data volumes
-```
-
-## 🌐 Network Configuration
-
-- **Bot Container**: Accessible via Telegram API
-- **Ollama Container**: Internal network only (port 11434)
-- **Default Network**: `bot-network` (Docker bridge)
-
-## 💾 Data Persistence
-
-- **Ollama Models**: Stored in `ollama_data` volume
-- **Bot Logs**: Mounted to `./logs/` directory
-- **Configuration**: Environment variables (no persistent state)
 
 ## 🚨 Troubleshooting
 
-### Bot Not Responding
-```bash
-# Check logs
-make logs-bot
+*   **Bot Not Responding:**
+    *   Check `TELEGRAM_BOT_TOKEN` in your `.env` file.
+    *   View container logs for errors.
+*   **"Connection refused" to Ollama:**
+    *   **Full Stack:** Ensure the `ollama` service is running and healthy within the stack.
+    *   **Bot-Only:** Verify `OLLAMA_HOST` in your `.env` correctly points to a running Ollama instance, and that network connectivity is allowed.
+*   **Ollama Models:** If using full stack, ensure you have pulled the desired Ollama models (`docker-compose exec ollama ollama pull llama2`).
 
-# Verify token
-docker-compose exec telegram-bot env | grep TELEGRAM
+## 💾 Data Persistence
 
-# Test connectivity
-docker-compose exec telegram-bot python -c "import telegram; print('OK')"
-```
-
-### Ollama Issues
-```bash
-# Check Ollama status
-make logs-ollama
-
-# List available models
-docker-compose exec ollama ollama list
-
-# Pull a model manually
-docker-compose exec ollama ollama pull llama2
-```
-
-### Common Issues
-
-**"Invalid token" error:**
-- Verify `TELEGRAM_BOT_TOKEN` in `.env`
-- Ensure no extra spaces or quotes
-
-**"Connection refused" to Ollama:**
-- Wait for Ollama to fully start (check logs)
-- Verify `OLLAMA_HOST` is set to `http://ollama:11434`
-
-**Out of memory:**
-- Increase Docker memory limit to 4GB+
-- Use smaller models (llama2:7b instead of 13b)
+*   **Ollama Models (Full Stack):** Stored in `ollama_data` volume.
+*   **Bot Logs:** Stored in `bot_logs` volume.
+*   **Configuration:** Handled via environment variables.
 
 ## 🔒 Security Considerations
 
-- **Environment Variables**: Never commit `.env` file
-- **Network Isolation**: Services communicate internally only
-- **Non-root User**: Bot runs as unprivileged user
-- **Input Validation**: Built-in security against malicious inputs
-- **Rate Limiting**: Automatic abuse prevention
-
-## 📈 Monitoring & Logs
-
-```bash
-# Real-time logs
-make logs
-
-# Bot-specific logs
-docker-compose logs -f telegram-bot
-
-# System resource usage
-docker stats
-
-# Container health
-docker-compose ps
-```
-
-## 🚀 Production Deployment
-
-For production environments:
-
-### 1. SSL/TLS Setup
-```bash
-# Use reverse proxy (nginx/caddy)
-# Configure SSL certificates
-# Set up domain name
-```
-
-### 2. Resource Limits
-```yaml
-# Add to docker-compose.yml
-services:
-  telegram-bot:
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-```
-
-### 3. Backup Strategy
-```bash
-# Backup Ollama models
-docker run --rm -v ollama_data:/source -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/ollama-models-$(date +%Y%m%d).tar.gz -C /source .
-```
-
-### 4. High Availability
-- Run multiple bot instances behind load balancer
-- Use Redis for session storage (available in dev mode)
-- Implement health checks and auto-healing
-
-## 📞 Support
-
-**Logs to check:**
-- `make logs` - All service logs
-- `docker-compose ps` - Container status
-- `docker system df` - Disk usage
-
-**Common commands:**
-```bash
-# Full reset
-make clean && make build && make up
-
-# Update deployment
-git pull && make build && make restart
-
-# Debug mode
-make shell  # Access container directly
-```
-
-## 📝 File Reference
-
-| File | Purpose | Required |
-|------|---------|----------|
-| `Dockerfile` | Bot container definition | ✅ |
-| `docker-compose.yml` | Service orchestration | ✅ |
-| `.env` | Environment configuration | ✅ |
-| `Makefile` | Command shortcuts | ✅ |
-| `requirements.txt` | Python dependencies | ✅ |
-| `.dockerignore` | Build optimization | ✅ |
+*   **Environment Variables**: Never commit your `.env` file to version control.
+*   **Network Isolation**: Docker Compose creates isolated networks by default.
+*   **Non-root User**: The bot runs as an unprivileged user within its container.
 
 ---
 
-**🎉 Happy deploying! Your AI-powered Telegram bot is ready to chat, summarize news, and analyze YouTube videos.**
+**🎉 Happy deploying! Your AI-powered Telegram bot is ready to chat.**

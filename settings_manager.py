@@ -7,6 +7,7 @@ Handles loading of user settings and fallback to example settings.
 import os
 import sys
 import logging
+import re
 from typing import Dict, Any, Optional
 from pathlib import Path
 
@@ -22,63 +23,50 @@ class SettingsManager:
 
     def load_settings(self):
         """Load settings with proper fallback logic."""
-        # Priority order: settings.py (user) -> settings.example.py (fallback)
-        settings_files = [
-            Path(__file__).parent / 'settings.py',  # User settings (ignored by git)
-            Path(__file__).parent / 'settings.example.py',  # Example settings (committed)
-        ]
+        # Priority order: settings.example.py -> settings.py -> environment variables
 
-        settings_loaded = False
-        loaded_file = None
+        # 1. Load example settings for defaults
+        example_settings_file = Path(__file__).parent / 'settings.example.py'
+        if example_settings_file.exists():
+            try:
+                self._load_settings_file(example_settings_file, is_example=True)
+                logger.info(f"Loaded default settings from: {example_settings_file}")
+            except Exception as e:
+                logger.error(f"Error loading {example_settings_file}: {e}")
+        else:
+            raise FileNotFoundError("settings.example.py not found. This file is required for default settings.")
 
-        for settings_file in settings_files:
-            if settings_file.exists():
-                try:
-                    # Use import-style loading instead of exec for security
-                    self._load_settings_file(settings_file)
-                    settings_loaded = True
-                    loaded_file = settings_file
-                    logger.info(f"Loaded settings from: {settings_file}")
+        # 2. Load user settings to override defaults
+        user_settings_file = Path(__file__).parent / 'settings.py'
+        if user_settings_file.exists():
+            try:
+                self._load_settings_file(user_settings_file)
+                logger.info(f"Loaded user settings from: {user_settings_file}")
+            except Exception as e:
+                logger.error(f"Error loading {user_settings_file}: {e}")
+        else:
+            logger.warning("No settings.py file found. Using default settings. Please create one from settings.example.py for your configuration.")
 
-                    # If we loaded user settings, we're done
-                    if settings_file.name == 'settings.py':
-                        break
+        # 3. Apply environment variables as final overrides
+        self._load_environment_variables()
 
-                except Exception as e:
-                    logger.error(f"Error loading {settings_file}: {e}")
-                    continue
-
-        if not settings_loaded:
-            raise FileNotFoundError(
-                "No settings file found. Please create 'settings.py' from 'settings.example.py'"
-            )
-
-        # Warn if using example settings
-        if loaded_file and loaded_file.name == 'settings.example.py':
-            logger.warning(
-                "Using example settings. Please copy settings.example.py to settings.py "
-                "and configure your actual values (API keys, tokens, etc.)"
-            )
-
-        # Validate required settings
+        # 4. Validate required settings
         self._validate_required_settings()
 
-    def _load_settings_file(self, settings_file: Path):
+    def _load_settings_file(self, settings_file: Path, is_example: bool = False):
         """Load settings from a Python file safely."""
+        if is_example:
+            self.settings = {} # Always start fresh with defaults
+
         with open(settings_file, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Use exec with restricted environment to parse the file
-        # This allows complex values like dicts and lists
         globals_dict = {}
         locals_dict = {}
 
         try:
-            # Execute the settings file with access to necessary modules
-            # Since this is a local config file, we provide standard globals
             exec(content, globals(), locals_dict)
 
-            # Filter to only uppercase settings keys (convention for config)
             for key, value in locals_dict.items():
                 if key.isupper():
                     self.settings[key] = value
@@ -86,6 +74,31 @@ class SettingsManager:
         except Exception as e:
             logger.error(f"Error loading settings from {settings_file}: {e}")
             raise
+
+    def _load_environment_variables(self):
+        """Load settings from environment variables, overriding existing settings."""
+        for key, value in os.environ.items():
+            if key.isupper() and key.startswith(('TELEGRAM_', 'DISCORD_', 'OLLAMA_', 'OPENAI_', 'GROQ_', 'TOGETHER_', 'HUGGINGFACE_', 'ANTHROPIC_', 'DEFAULT_', 'MAX_', 'LOG_', 'ADMIN_', 'DATABASE_', 'OPENWEATHERMAP_', 'PLUGINS_')):
+                # Attempt to convert to appropriate type if possible
+                if value.lower() == 'true':
+                    self.settings[key] = True
+                elif value.lower() == 'false':
+                    self.settings[key] = False
+                elif value.isdigit():
+                    self.settings[key] = int(value)
+                elif re.match(r'^\d+\.\d+$', value):
+                    self.settings[key] = float(value)
+                elif key == 'ADMIN_USER_IDS': # Special case for list of integers
+                    try:
+                        self.settings[key] = [int(uid.strip()) for uid in value.split(',')]
+                    except ValueError:
+                        logger.warning(f"Invalid ADMIN_USER_IDS environment variable: {value}. Must be comma-separated integers.")
+                        self.settings[key] = []
+                elif key == 'ENABLED_PLUGINS': # Special case for comma-separated plugins
+                    self.settings[key] = [p.strip() for p in value.split(',')]
+                else:
+                    self.settings[key] = value
+                logger.debug(f"Overridden setting from environment: {key}={self.settings[key]}")
 
     def _validate_required_settings(self):
         """Validate that required settings are present."""

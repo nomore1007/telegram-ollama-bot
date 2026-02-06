@@ -11,8 +11,6 @@ from typing import Dict, Any
 # Load settings using the settings manager
 from settings_manager import settings_manager, settings, config
 
-
-
 from telegram import Update, BotCommand
 from telegram.ext import (
     Application,

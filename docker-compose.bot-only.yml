@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Telegram Bot Service (connects to existing Ollama)
   telegram-bot:
-    image: ghcr.io/nomore1007/telegram-ollama-bot:latest
+    build: .
     container_name: deepthought-bot
     restart: unless-stopped
     environment:
