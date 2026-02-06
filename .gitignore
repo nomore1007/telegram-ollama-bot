@@ -21,6 +21,7 @@ wheels/
 *.egg
 
 # Settings and Configuration (NEVER COMMIT SENSITIVE DATA)
+config.py
 settings.py
 .env
 .env.local
@@ -59,6 +60,7 @@ bot_env/
 # Logs
 *.log
 logs/
+deepthought_bot.db
 
 # IDE
 .vscode/
