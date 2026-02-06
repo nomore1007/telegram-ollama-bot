@@ -47,5 +47,15 @@ else
     ls -l "$USER_CONFIG"
 fi
 
+echo "--- Starting Network Diagnostics ---"
+
+echo "Pinging api.telegram.org..."
+ping -c 4 api.telegram.org || echo "Ping failed or timed out."
+
+echo "Curling https://api.telegram.org (without token for reachability check)..."
+curl -v -m 10 https://api.telegram.org || echo "Curl failed or timed out."
+
+echo "--- Network Diagnostics Complete ---"
+
 # Execute the main command
 exec "$@"
