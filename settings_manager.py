@@ -10,6 +10,7 @@ import logging
 import re
 from typing import Dict, Any, Optional
 from pathlib import Path
+import shutil # For copying the example config
 
 logger = logging.getLogger(__name__)
 
@@ -26,42 +27,56 @@ class SettingsManager:
 
     def load_settings(self):
         """Load settings with proper fallback logic."""
-        # Priority order: settings.example.py -> settings.py -> environment variables
+        # Priority order: config.example.py (to create config.py) -> config.py -> environment variables
 
-        # 1. Load example settings for defaults
-        example_settings_file = self._config_dir / 'settings.example.py'
-        if example_settings_file.exists():
+        # Define config file paths
+        example_config_file = self._config_dir / 'config.example.py'
+        user_config_file = self._config_dir / 'config.py'
+
+        if not example_config_file.exists():
+            raise FileNotFoundError(f"{example_config_file} not found. This template file is required for default settings.")
+
+        # If user config file doesn't exist, create it from the example
+        if not user_config_file.exists():
             try:
-                self._load_settings_file(example_settings_file, is_example=True)
-                logger.info(f"Loaded default settings from: {example_settings_file}")
+                shutil.copyfile(example_config_file, user_config_file)
+                logger.info(f"Created '{user_config_file.name}' from '{example_config_file.name}'. Please edit it with your configuration.")
+                # Give write permissions to the new config file for easier editing
+                os.chmod(user_config_file, 0o664)
             except Exception as e:
-                logger.error(f"Error loading {example_settings_file}: {e}")
-        else:
-            raise FileNotFoundError(f"{example_settings_file} not found. This file is required for default settings.")
-
-        # 2. Load user settings to override defaults
-        user_settings_file = self._config_dir / 'settings.py'
-        if user_settings_file.exists():
+                logger.error(f"Error creating user config file '{user_config_file}': {e}")
+                # Fallback to loading example directly if creation fails
+                self._load_config_file(example_config_file, is_example=True)
+                logger.warning(f"Could not create '{user_config_file.name}'. Using defaults from '{example_config_file.name}'.")
+        
+        # Load the user config file (which might have just been created)
+        if user_config_file.exists():
             try:
-                self._load_settings_file(user_settings_file)
-                logger.info(f"Loaded user settings from: {user_settings_file}")
+                self._load_config_file(user_config_file)
+                logger.info(f"Loaded configuration from: {user_config_file}")
             except Exception as e:
-                logger.error(f"Error loading {user_settings_file}: {e}")
+                logger.error(f"Error loading user config file '{user_config_file}': {e}. Falling back to example defaults.")
+                # If user config is broken, try loading example defaults
+                self._load_config_file(example_config_file, is_example=True)
         else:
-            logger.warning("No settings.py file found. Using default settings. Please create one from settings.example.py for your configuration.")
+            # Fallback if user_config_file still doesn't exist for some reason
+            self._load_config_file(example_config_file, is_example=True)
+            logger.warning(f"Configuration file '{user_config_file.name}' not found. Using defaults from '{example_config_file.name}'.")
 
-        # 3. Apply environment variables as final overrides
+
+        # Apply environment variables as final overrides
         self._load_environment_variables()
 
-        # 4. Validate required settings
+        # Validate required settings
         self._validate_required_settings()
 
-    def _load_settings_file(self, settings_file: Path, is_example: bool = False):
-        """Load settings from a Python file safely."""
+    def _load_config_file(self, config_file: Path, is_example: bool = False):
+        """Load settings from a Python config file safely."""
         if is_example:
-            self.settings = {} # Always start fresh with defaults
+            # Clear settings if loading example to ensure a clean slate for defaults
+            self.settings = {}
 
-        with open(settings_file, 'r', encoding='utf-8') as f:
+        with open(config_file, 'r', encoding='utf-8') as f:
             content = f.read()
 
         globals_dict = {}
@@ -71,11 +86,11 @@ class SettingsManager:
             exec(content, globals(), locals_dict)
 
             for key, value in locals_dict.items():
-                if key.isupper():
+                if key.isupper(): # Conventionally, settings are uppercase
                     self.settings[key] = value
 
         except Exception as e:
-            logger.error(f"Error loading settings from {settings_file}: {e}")
+            logger.error(f"Error loading settings from {config_file}: {e}")
             raise
 
     def _load_environment_variables(self):

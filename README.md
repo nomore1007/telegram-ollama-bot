@@ -42,19 +42,9 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-**Quick Setup:**
-```bash
-# Run the setup script to create settings.py
-python setup.py
-```
+The bot automatically creates a `config.py` from `config.example.py` if it doesn't exist in the bot's configuration directory (`/opt/telegram-ollama-bot` in Docker deployments).
 
-**Manual Setup:**
-```bash
-# Copy and edit the settings file
-cp settings.example.py settings.py
-```
-
-Configure your settings in `settings.py` or use environment variables. The bot will automatically load `settings.py` (your configuration) or fall back to `settings.example.py` (defaults).
+Configure your settings in `config.py` (located in your configured persistent directory) or use environment variables. Environment variables take precedence over settings in `config.py`.
 
 ### 3. Run the Bot
 
@@ -64,45 +54,17 @@ python bot.py
 
 ## ⚙️ Configuration
 
-### Required Settings
-
-| Setting | Description | Example |
-|---------|-------------|---------|
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather | `123456789:ABCdefGHIjklMNOpqrsTUVwxyz` |
-| `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
-| `OPENWEATHERMAP_API_KEY` | Weather API key | - | `your_weather_api_key` |
-
-### Optional Settings
-
-| Setting | Description | Default | Example |
-|---------|-------------|---------|---------|
-| `LLM_PROVIDER` | AI provider: `ollama`, `openai`, `groq`, `together`, `huggingface`, `anthropic` | `ollama` | `openai` |
-| `OLLAMA_MODEL` | Default Ollama model | `llama2` | `mistral` |
-| `OPENAI_API_KEY` | OpenAI API key | - | `sk-...` |
-| `GROQ_API_KEY` | Groq API key | - | `gsk_...` |
-| `TOGETHER_API_KEY` | Together AI API key | - | `your_key` |
-| `HUGGINGFACE_API_KEY` | Hugging Face API key | - | `hf_...` |
-| `ANTHROPIC_API_KEY` | Anthropic API key | - | `sk-ant-...` |
-| `DISCORD_BOT_TOKEN` | Discord bot token | - | `MTIz...` |
-| `ADMIN_USER_IDS` | Comma-separated admin user IDs | `[]` | `123456789,987654321` |
-| `ENABLED_PLUGINS` | Active plugins | `telegram,web_search,discord,weather,calculator` | `telegram,discord` |
-| `DEFAULT_PERSONALITY` | Bot personality | `helpful` | `humorous` |
-| `TIMEOUT` | Request timeout (seconds) | `30` | `60` |
-| `DEFAULT_PROMPT` | System prompt for AI | Custom prompt | - |
+The bot loads settings in this priority order:
+1. `config.py` (your custom configuration, auto-generated from `config.example.py` if missing)
+2. Environment variables (`.env` file or system env)
 
 ### Admin Setup
 
-**Initial Admin Configuration:**
-```bash
-# Method 1: Direct settings file edit
-ADMIN_USER_IDS: list = [123456789]  # Your Telegram user ID
-
-# Method 2: Using the admin CLI (recommended)
-python admin_cli.py setup 123456789
-```
-
 **Admin Management CLI:**
 ```bash
+# Initial admin setup
+python admin_cli.py setup YOUR_TELEGRAM_USER_ID
+
 # Add an admin
 python admin_cli.py add 987654321
 
@@ -111,59 +73,6 @@ python admin_cli.py remove 987654321
 
 # List all admins
 python admin_cli.py list
-
-# Use custom settings file
-python admin_cli.py --settings my_settings.py add 123456789
-```
-
-### Environment Variables
-
-All settings can be configured via environment variables or `.env` file:
-
-**Environment Variables:**
-```bash
-export TELEGRAM_BOT_TOKEN="your_token"
-export LLM_PROVIDER="openai"
-export OPENAI_API_KEY="sk-..."
-export ADMIN_USER_IDS="123456789"
-```
-
-**Or create a `.env` file:**
-```bash
-cp .env.example .env
-# Edit .env with your values
-```
-
-The bot loads settings in this priority order:
-1. `settings.py` (your custom configuration)
-2. Environment variables (`.env` file or system env)
-3. `settings.example.py` (fallback defaults)
-
-### Environment File (.env)
-
-For convenience, you can create a `.env` file in the project root:
-
-```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit with your configuration
-nano .env
-```
-
-**Security Note:** The `.env` file contains sensitive information (API keys, tokens, passwords) and is automatically ignored by Git. **Never commit `.env` files or any files containing sensitive credentials to version control.**
-
-**Important Security Practices:**
-- ✅ Use `.env.example` as a template (it contains no sensitive data)
-- ✅ Set restrictive file permissions: `chmod 600 .env`
-- ✅ Never share `.env` files or commit them to Git
-- ✅ Use environment variables in production deployments
-- ✅ Regularly rotate API keys and tokens
-
-**File permissions:**
-```bash
-# Set restrictive permissions on .env file
-chmod 600 .env
 ```
 
 ## 🤖 Commands

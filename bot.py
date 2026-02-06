@@ -639,25 +639,6 @@ class TelegramOllamaBot:
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands set successfully.")
 
-        # Start background task to check for settings changes
-        asyncio.create_task(self._check_settings_changes())
-
-    async def _check_settings_changes(self):
-        """Periodically check for settings file changes."""
-        import os
-        settings_file = os.path.join(os.path.dirname(__file__), 'settings.py')
-        last_mtime = os.path.getmtime(settings_file) if os.path.exists(settings_file) else 0
-
-        while True:
-            await asyncio.sleep(60)  # Check every minute
-            try:
-                current_mtime = os.path.getmtime(settings_file) if os.path.exists(settings_file) else 0
-                if current_mtime > last_mtime:
-                    logger.info("Settings file has been modified. Some changes may require a bot restart to take effect.")
-                    last_mtime = current_mtime
-            except Exception as e:
-                logger.error(f"Error checking settings file: {e}")
-
     def run(self):
         """
         Runs the bot.

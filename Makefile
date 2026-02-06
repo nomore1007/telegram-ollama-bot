@@ -1,6 +1,6 @@
 # Makefile for Docker operations
 
-.PHONY: help build up down restart logs clean dev test rebuild health pull setup
+.PHONY: help build up down restart logs clean dev test rebuild health pull
 
 # Default target
 help: ## Show this help message

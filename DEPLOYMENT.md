@@ -24,7 +24,7 @@ cd telegram-ollama-bot
 
 ## Step 3: Configure Environment Variables
 
-The bot uses environment variables and/or a `settings.py` file for configuration. It's recommended to manage `settings.py` within a persistent host directory for easier updates and portability.
+The bot uses environment variables and/or a `config.py` file for configuration. It's recommended to manage `config.py` within a persistent host directory for easier updates and portability.
 
 Create a `.env` file in the project root to store your primary environment variables.
 
@@ -41,24 +41,24 @@ nano .env  # or your preferred editor
 *   `TELEGRAM_BOT_TOKEN=your_actual_bot_token_here` (Replace with the token you got from @BotFather)
 *   `OLLAMA_HOST=http://your_ollama_ip:11434` (This **must** be set to the address of your existing Ollama instance.)
 
-**Important: Initializing `settings.py` within the persistent host directory**
+**Important: Initializing `config.py` within the persistent host directory**
 
-For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `settings.py` file. This file should be placed within the host directory `/opt/telegram-ollama-bot`.
+For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `config.py` file. This file should be placed within the host directory `/opt/telegram-ollama-bot`.
 
-If `settings.py` doesn't exist in this directory, the bot will use `settings.example.py` for defaults. To create your custom `settings.py`:
+If `config.py` doesn't exist in this directory, the bot will automatically create it from `config.example.py` (located in the container's `/app` directory) during its first run. To create or customize your `config.py`:
 
 1.  **Ensure the host directory exists:**
     ```bash
     sudo mkdir -p /opt/telegram-ollama-bot
     sudo chown -R $USER:$USER /opt/telegram-ollama-bot # Adjust ownership as needed
     ```
-2.  **Copy `settings.example.py` to the host directory:**
+2.  **Copy `config.example.py` from the project's root to the host directory (if you want to start customizing before the first run):**
     ```bash
-    cp settings.example.py /opt/telegram-ollama-bot/settings.py
+    cp config.example.py /opt/telegram-ollama-bot/config.py
     ```
-3.  **Edit `settings.py` directly on your host machine:**
+3.  **Edit `config.py` directly on your host machine:**
     ```bash
-    nano /opt/telegram-ollama-bot/settings.py # or your preferred editor
+    nano /opt/telegram-ollama-bot/config.py # or your preferred editor
     ```
 
 **Other Optional Settings (with defaults):**
@@ -121,7 +121,7 @@ docker-compose logs -f # View bot logs
 ## 💾 Data Persistence
 
 *   **Bot Logs:** Stored in `bot_logs` volume.
-*   **Configuration & Database:** Stored in the host directory `/opt/telegram-ollama-bot`. This includes `settings.py` and `deepthought_bot.db`.
+*   **Configuration & Database:** Stored in the host directory `/opt/telegram-ollama-bot`. This includes `config.py` and `deepthought_bot.db`.
 
 ## 🔒 Security Considerations
 
