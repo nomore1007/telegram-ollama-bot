@@ -22,7 +22,8 @@ services:
       - bot-network
     volumes:
       - bot_logs:/app/logs
-      - bot_config:/opt/telegram-ollama-bot # Mount volume for config files
+      - /opt/telegram-ollama-bot:/opt/telegram-ollama-bot # Bind mount for config files
+
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
@@ -39,8 +40,6 @@ services:
 
 volumes:
   bot_logs:
-    driver: local
-  bot_config:
     driver: local
 
 networks:
