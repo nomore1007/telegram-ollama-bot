@@ -21,11 +21,11 @@ class SettingsManager:
     def __init__(self):
         # Determine the base directory for persistent config files (user-editable)
         # Prioritize BOT_CONFIG_DIR environment variable, otherwise use current working directory
-        self._config_dir = Path(os.getenv("BOT_CONFIG_DIR", Path.cwd()))
+        self._config_dir = Path(os.getenv("CONFIG_DIR", Path.cwd()))
 
         # Determine the application source directory (where config.example.py is)
         # In Docker, this is /app. Outside Docker, it's the script's directory.
-        self._app_source_dir = Path(os.getenv("BOT_APP_SOURCE_DIR", Path(__file__).parent))
+        self._app_source_dir = Path(os.getenv("APP_SOURCE_DIR", Path(__file__).parent))
 
         self.settings = {}
         self.load_settings()
