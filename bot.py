@@ -640,13 +640,27 @@ class TelegramOllamaBot:
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands set successfully.")
 
-    def _is_valid_telegram_token(self, token: Optional[str]) -> bool:
-        """Checks if a Telegram bot token is valid (not None, not empty, not a placeholder)."""
-        if not token:
-            return False
-        if isinstance(token, str) and (token.strip() == "" or token.startswith('YOUR_') and token.endswith('_HERE')):
-            return False
-        return True
+        def _is_valid_telegram_token(self, token: Optional[str]) -> bool:
+
+            """Checks if a Telegram bot token is valid (not None, not empty, not a placeholder)."""
+
+            if not token:
+
+                return False
+
+            if isinstance(token, str) and (
+
+                token.strip() == "" or
+
+                token.startswith('YOUR_') and token.endswith('_HERE') or
+
+                token == "12345:ABCDEF" # Add check for the specific dummy token
+
+            ):
+
+                return False
+
+            return True
 
     async def _test_initialize_and_run(self, app: Application):
         """Initializes the application for testing purposes and then runs the polling."""
