@@ -12,4 +12,7 @@ sys.path.insert(0, script_dir)
 from bot import main
 
 if __name__ == "__main__":
-    main()
+    if "--test" in sys.argv:
+        main(test_mode=True)
+    else:
+        main()

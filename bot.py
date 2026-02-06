@@ -20,8 +20,7 @@ from telegram.ext import (
     CallbackContext,
     filters,
 )
-from constants import (
-    MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
+from constants import (    MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
     LOG_FORMAT, LOG_LEVEL
 )
 from llm_client import LLMClient, OllamaProvider
@@ -682,7 +681,7 @@ class TelegramOllamaBot:
         bot_token = telegram_config.get('bot_token')
 
         if self._is_valid_telegram_token(bot_token):
-            app_builder = Application.builder().token(bot_token).request_kwargs({"local_address": "0.0.0.0"})
+            app_builder = Application.builder().token(bot_token)
             app_builder.post_init(self.post_init)
             app = app_builder.build()
             telegram_bot_active = True
