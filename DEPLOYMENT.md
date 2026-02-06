@@ -50,6 +50,9 @@ nano .env  # or your preferred editor
     *   **Inside Docker:** This is automatically set by `docker-compose.yml` to `/app`.
     *   **Outside Docker:** If not set, it defaults to the directory where the `settings_manager.py` script is located. You generally won't need to change this.
 
+**Network Configuration:**
+For Docker deployments, the `telegram-bot` service is configured to use `8.8.8.8` (Google's DNS) to help resolve potential DNS issues within the container.
+
 **Important: Initializing `config.py` within the configuration directory**
 
 For advanced configuration (e.g., plugin settings, complex personality prompts) or if you prefer file-based configuration over environment variables, you'll need a `config.py` file. This file should be placed within the configured `BOT_CONFIG_DIR`.
@@ -144,7 +147,7 @@ docker-compose logs -f # View bot logs
 ## 🔒 Security Considerations
 
 *   **Environment Variables**: Never commit your `.env` file to version control.
-*   **Network Isolation**: Docker Compose creates isolated networks by default.
+*   **Host Network Mode**: The container shares the network stack of the host. This can expose container ports to the host's network interfaces directly and bypass network isolation. Ensure you understand the implications.
 *   **Non-root User**: The bot runs as an unprivileged user within its container.
 
 ---
