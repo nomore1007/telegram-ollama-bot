@@ -6,7 +6,7 @@ import re
 import sys
 import os
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # Load settings using the settings manager
 from settings_manager import settings_manager, settings, config
