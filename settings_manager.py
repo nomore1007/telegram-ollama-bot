@@ -153,7 +153,7 @@ class SettingsManager:
         if missing:
             raise ValueError(
                 f"Required settings are missing or not configured: {', '.join(missing)}. "
-                f"Please check your settings.py file and replace placeholder values with actual configuration."
+                f"Please check your config.py file and replace placeholder values with actual configuration."
             )
 
     def get(self, key: str, default=None):

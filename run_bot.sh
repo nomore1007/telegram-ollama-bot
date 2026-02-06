@@ -14,8 +14,8 @@ if [ ! -d "bot_env" ]; then
 fi
 
 # Check if settings.py exists and has a token
-if [ ! -f "settings.py" ] || ! grep -q "TELEGRAM_BOT_TOKEN.*=" settings.py 2>/dev/null; then
-    echo "⚠️  settings.py not found or invalid!"
+if [ ! -f "config.py" ] || ! grep -q "TELEGRAM_BOT_TOKEN.*=" config.py 2>/dev/null; then
+    echo "⚠️  config.py not found or invalid!"
     echo "Run: ./setup.sh YOUR_TELEGRAM_TOKEN"
     echo ""
     echo "Get your token from: https://t.me/botfather"
@@ -23,12 +23,12 @@ if [ ! -f "settings.py" ] || ! grep -q "TELEGRAM_BOT_TOKEN.*=" settings.py 2>/de
 fi
 
 # Extract token from settings.py for environment variable
-TOKEN_FROM_SETTINGS=$(grep "TELEGRAM_BOT_TOKEN.*=" settings.py | sed 's/.*= *"*\([^"]*\)"*/\1/' | tr -d "'\"")
+TOKEN_FROM_SETTINGS=$(grep "TELEGRAM_BOT_TOKEN.*=" config.py | sed 's/.*= *"*\([^"]*\)"*/\1/' | tr -d "'\"")
 if [ -n "$TOKEN_FROM_SETTINGS" ]; then
     export TELEGRAM_BOT_TOKEN="$TOKEN_FROM_SETTINGS"
-    echo "✅ Token loaded from settings.py"
+    echo "✅ Token loaded from config.py"
 else
-    echo "❌ Could not extract token from settings.py"
+    echo "❌ Could not extract token from config.py"
     exit 1
 fi
 

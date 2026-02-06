@@ -21,8 +21,8 @@ TOKEN="$1"
 echo "✅ Token received (length: ${#TOKEN})"
 
 # Create settings.py with the token
-cat > settings.py << EOF
-# Bot Configuration - Created by setup.sh
+cat > config.py << EOF
+# Bot Configuration - Created by setup.sh (config.py)
 # This file contains sensitive information and is excluded from version control
 
 # Bot Identity
@@ -62,7 +62,7 @@ if not OLLAMA_HOST:
     raise ValueError("OLLAMA_HOST is required")
 EOF
 
-echo "✅ Settings.py created with your token"
+echo "✅ Config.py created with your token"
 
 # Set environment variables as backup
 export TELEGRAM_BOT_TOKEN="$TOKEN"
@@ -85,16 +85,16 @@ import sys, os
 sys.path.insert(0, '$PROJECT_DIR')
 
 # Load settings directly (same as bot.py)
-settings_path = os.path.join('$PROJECT_DIR', 'settings.py')
+settings_path = os.path.join('$PROJECT_DIR', 'config.py')
 if os.path.exists(settings_path):
     with open(settings_path, 'r', encoding='utf-8') as f:
         exec(f.read(), globals())
 else:
-    print(f'Settings file not found at {settings_path}')
+    print(f'Config file not found at {settings_path}')
     exit(1)
 
 try:
-    print('Settings loaded')
+    print('Config loaded')
 
     from constants import MAX_MESSAGE_LENGTH
     print('Constants imported')

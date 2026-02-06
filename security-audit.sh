@@ -45,11 +45,10 @@ echo "🛡️  ADDITIONAL SECURITY CHECKS"
 echo "==============================="
 
 # Check for sensitive files
-echo "📁 Checking for sensitive files..."
-if [ -f "settings.py" ]; then
-    echo "✅ settings.py exists (excluded from git)"
+if [ -f "config.py" ]; then
+    echo "✅ config.py exists (excluded from git)"
 else
-    echo "❌ settings.py not found"
+    echo "❌ config.py not found"
 fi
 
 # Check environment variables
@@ -63,9 +62,9 @@ fi
 
 # Check file permissions
 echo "🔒 Checking file permissions..."
-if [ -f "settings.py" ]; then
-    PERMS=$(stat -c "%a" settings.py 2>/dev/null || echo "unknown")
-    echo "✅ settings.py permissions: $PERMS"
+if [ -f "config.py" ]; then
+    PERMS=$(stat -c "%a" config.py 2>/dev/null || echo "unknown")
+    echo "✅ config.py permissions: $PERMS"
 fi
 
 echo ""

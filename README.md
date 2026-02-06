@@ -193,7 +193,7 @@ python admin_cli.py list
 export LLM_PROVIDER="openai"
 export OPENAI_API_KEY="your_key"
 
-# Via settings.py
+- Via config.py
 LLM_PROVIDER = "groq"
 GROQ_API_KEY = "your_key"
 ```
@@ -602,7 +602,7 @@ ENABLED_PLUGINS = "telegram,discord,myplugin"
 
 **Admin setup issues:**
 - Use `python admin_cli.py setup YOUR_USER_ID` for initial admin setup
-- Check that ADMIN_USER_IDS is properly configured in settings.py
+- Check that ADMIN_USER_IDS is properly configured in config.py
 - Ensure your user ID is correct (use `/userid` command once bot is running)
 - Use `python admin_cli.py list` to verify admin configuration
 

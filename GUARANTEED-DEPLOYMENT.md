@@ -46,10 +46,10 @@ git clone https://github.com/nomore1007/telegram-ollama-bot.git
 cd telegram-ollama-bot
 
 # Create settings (copy from example)
-cp settings.example.py settings.py
+cp config.example.py config.py
 
 # Edit settings.py with your values
-nano settings.py
+nano config.py
 ```
 
 ### Step 3: Run the Bot

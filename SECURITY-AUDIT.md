@@ -29,7 +29,7 @@ The Telegram Ollama Bot has solid security foundations with proper input validat
 - ✅ **Clean Recovery**: Old requests automatically cleaned up
 
 ### **4. Data Protection**
-- ✅ **Git Exclusion**: `settings.py` not in repository
+- ✅ **Git Exclusion**: `config.py` not in repository
 - ✅ **No Sensitive Logging**: Credentials not logged
 - ✅ **Memory-Only Context**: Conversation history in RAM only
 

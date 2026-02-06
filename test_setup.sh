@@ -4,8 +4,8 @@
 echo "🧪 Testing bot setup..."
 
 # Check if settings.py exists
-if [ ! -f "settings.py" ]; then
-    echo "❌ settings.py not found. Run: cp settings.example.py settings.py"
+if [ ! -f "config.py" ]; then
+    echo "❌ config.py not found. Run: cp config.example.py config.py"
     exit 1
 fi
 
@@ -15,11 +15,11 @@ if python3 -c "
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath('.')))
 try:
-    import settings
-    print('✅ Settings imported successfully')
-    print(f'   Token configured: {bool(settings.TELEGRAM_BOT_TOKEN)}')
-    print(f'   Ollama host: {settings.OLLAMA_HOST}')
-    print(f'   Model: {settings.OLLAMA_MODEL}')
+    import config
+    print('✅ Config imported successfully')
+    print(f'   Token configured: {bool(config.TELEGRAM_BOT_TOKEN)}')
+    print(f'   Ollama host: {config.OLLAMA_HOST}')
+    print(f'   Model: {config.OLLAMA_MODEL}')
 except Exception as e:
     print(f'❌ Settings error: {e}')
     exit(1)
