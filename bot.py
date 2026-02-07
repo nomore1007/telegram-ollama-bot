@@ -567,12 +567,15 @@ class TelegramOllamaBot:
             # Build prompt with personality
             personality_prompt = personality_manager.get_system_prompt(self.personality, channel_prompt)
             context = self.conversation_manager.get_context(chat_id, personality_prompt)
+            logger.debug(f"LLM Context for chat {chat_id}: {context}")
 
             # Get available tools
             tools = self._get_available_tools()
 
             # Generate response with tool support
             response, tool_calls = await channel_llm.generate_with_tools(context, tools)
+            if tool_calls:
+                logger.debug(f"LLM generated tool calls for chat {chat_id}: {tool_calls}")
 
             # Execute tool calls if any
             if tool_calls:
@@ -854,6 +857,7 @@ class TelegramOllamaBot:
         return "\n\n".join(results)
 
     async def _execute_single_tool(self, tool_name: str, parameters: dict) -> str:
+        logger.debug(f"Executing tool: {tool_name} with parameters: {parameters}")
         """Execute a single tool call"""
         if tool_name == 'web_search':
             query = parameters.get('query', '')
