@@ -282,6 +282,7 @@ class TelegramOllamaBot:
     # ---------------------------------------------------------------
 
     async def handle_message(self, update: Update, context: CallbackContext):
+        logger.debug(f"handle_message called for chat_id: {update.message.chat.id}")
         """Handle incoming messages"""
         if update.message:
             message_text = update.message.text
@@ -751,7 +752,9 @@ class TelegramOllamaBot:
         # --- Start Telegram Bot (only if configured and not in test mode) ---
         if telegram_bot_active:
             logger.info("Starting Telegram Ollama bot")
+            logger.debug("Attempting to run Telegram polling...")
             app.run_polling()
+            logger.debug("Telegram polling has stopped.")
 
     def _get_available_tools(self) -> list:
         """Get list of available tools for the LLM"""
