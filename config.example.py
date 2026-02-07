@@ -45,6 +45,8 @@ HUGGINGFACE_API_KEY: Optional[str] = None
 ANTHROPIC_API_KEY: Optional[str] = None
 OPENWEATHERMAP_API_KEY: Optional[str] = None # Required for weather plugin
 
+TELEGRAM_API_TIMEOUT: int = 300 # Timeout for Telegram API requests in seconds
+
 # AI model parameters
 MAX_TOKENS: int = 2000
 TEMPERATURE: float = 0.7
