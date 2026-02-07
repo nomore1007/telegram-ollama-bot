@@ -24,6 +24,14 @@ from telegram.request import HTTPXRequest
 from constants import (    MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VIDEOS_PER_MESSAGE,
     LOG_FORMAT, LOG_LEVEL
 )
+
+logging.basicConfig(
+    format=LOG_FORMAT,
+    level=getattr(logging, LOG_LEVEL),
+    force=True, # Force re-configuration of logging for modules loaded earlier
+)
+logger = logging.getLogger(__name__)
+
 from llm_client import LLMClient, OllamaProvider
 from summarizers import NewsSummarizer, YouTubeSummarizer
 from handlers import TelegramHandlers
@@ -31,12 +39,6 @@ from conversation import ConversationManager
 from security import InputValidator, RateLimiter
 from admin import AdminManager
 from personality import Personality, personality_manager
-# -------------------------------------------------------------------
-# Logging setup (early for safe imports)
-# -------------------------------------------------------------------
-
-import logging
-logger = logging.getLogger(__name__)
 
 from plugins import plugin_manager
 
@@ -68,14 +70,6 @@ URLShortenerPlugin = safe_import_plugin('url_shortener_plugin', 'URLShortenerPlu
 from database import ChannelSettings
 
 
-# -------------------------------------------------------------------
-# Logging
-# -------------------------------------------------------------------
-
-logging.basicConfig(
-    format=LOG_FORMAT,
-    level=getattr(logging, LOG_LEVEL),
-)
 
 
 # -------------------------------------------------------------------
