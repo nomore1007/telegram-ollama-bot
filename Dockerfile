@@ -38,4 +38,4 @@ RUN useradd --create-home --shell /bin/bash app && \
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Default command to run the bot, relative to the WORKDIR
-CMD ["python", "bot.py"]
+CMD ["python", "run_bot.py"]
