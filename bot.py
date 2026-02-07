@@ -27,7 +27,7 @@ from constants import (    MAX_MESSAGE_LENGTH, MAX_ARTICLES_PER_MESSAGE, MAX_VID
 
 logging.basicConfig(
     format=LOG_FORMAT,
-    level=getattr(logging, LOG_LEVEL),
+    level=getattr(logging, config.LOG_LEVEL),
     force=True, # Force re-configuration of logging for modules loaded earlier
 )
 logger = logging.getLogger(__name__)
