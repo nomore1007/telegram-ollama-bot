@@ -23,6 +23,7 @@ wheels/
 # Settings and Configuration (NEVER COMMIT SENSITIVE DATA)
 config.py
 settings.py
+config.py
 .env
 .env.local
 .env.*

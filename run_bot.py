@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/nomore/telegram-ollama-bot/.venv/bin/python3
 """Wrapper script to run the Telegram Ollama Bot with correct imports"""
 
 import sys

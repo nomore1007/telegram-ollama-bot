@@ -50,6 +50,12 @@ rebuild: ## Rebuild and restart the bot service
 test: ## Run tests in the bot container
 	docker-compose exec telegram-bot pytest
 
+lint: ## Run linter (ruff)
+	.venv/bin/ruff check .
+
+format: ## Run formatter (black)
+	.venv/bin/black .
+
 # Shell access to bot container
 shell: ## Open shell in bot container
 	docker-compose exec telegram-bot bash

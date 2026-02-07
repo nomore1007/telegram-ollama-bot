@@ -35,7 +35,7 @@ LLM_PROVIDER: str = "ollama"
 
 # Ollama server configuration (only if LLM_PROVIDER is 'ollama')
 OLLAMA_HOST: str = "http://localhost:11434"
-OLLAMA_MODEL: str = "llama2" # Default Ollama model to use
+OLLAMA_MODEL: str = "smollm2:135m" # Default Ollama model to use
 
 # API Keys for cloud providers (leave as None if not using, or if configured via environment variable)
 OPENAI_API_KEY: Optional[str] = None
